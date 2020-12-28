@@ -14,6 +14,15 @@ class Array:
             raise Exception("Index out of range")
 
 
+class Iterator:
+    def __init__(self, memory_offset, limit_address):
+        self.cur_value_address = memory_offset
+        self.limit_address = limit_address
+
+    def __repr__(self):
+        return f"iterator at {self.cur_value_address}"
+
+
 class SymbolTable(dict):
     def __init__(self):
         super().__init__()
@@ -40,10 +49,12 @@ class SymbolTable(dict):
         self.memory_offset += 1
         return self.memory_offset - 1
 
-    def add_iterator(self, value):
-        self.iterators.setdefault(value, self.memory_offset)
+    def add_iterator(self, name):
+        last_address = self.memory_offset
         self.memory_offset += 1
-        return self.memory_offset - 1
+        self.iterators.setdefault(name, Iterator(self.memory_offset, last_address))
+        self.memory_offset += 1
+        return self.memory_offset - 1, last_address
 
     def is_iterator(self, value):
         return value in self.iterators
@@ -52,7 +63,7 @@ class SymbolTable(dict):
         if name in self:
             return self[name]
         elif name in self.iterators:
-            return self.iterators[name]
+            return self.iterators[name].cur_value_address
         else:
             raise Exception(f"Undeclared variable {name}")
 
@@ -70,6 +81,11 @@ class SymbolTable(dict):
             return self.get_variable(target)
         else:
             return self.get_array_at(target[0], target[1])
+
+    def get_iterator(self, name):
+        if name in self.iterators:
+            iterator = self.iterators[name]
+            return iterator.cur_value_address, iterator.limit_address
 
     def get_const(self, val):
         if val in self.consts:

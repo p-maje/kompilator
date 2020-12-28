@@ -105,14 +105,11 @@ class ImpParser(Parser):
 
     @_('FOR PID FROM value TO value DO commands ENDFOR')
     def command(self, p):
-        # TODO this is a mess
-        self.symbols.add_variable(p[1])
-        return "forup", p[1], ('assign', p[1], p[3]), ('le', ('load', p[1]), p[5]), p[7]
+        return "forup", p[1], p[3], p[5], p[7]
 
     @_('FOR PID FROM value DOWNTO value DO commands ENDFOR')
     def command(self, p):
-        self.symbols.add_variable(p[1])
-        return "fordown", p[1], ('assign', p[1], p[3]), ('ge', ('load', p[1]), p[5]), p[7]
+        return "fordown", p[1], p[3], p[5], p[7]
 
     @_('READ identifier ";"')
     def command(self, p):
@@ -181,30 +178,30 @@ class ImpParser(Parser):
     @_('PID')
     def identifier(self, p):
         # TODO this is a mess also
-        return p[0]
         if p[0] in self.symbols:
             return p[0]
         else:
-            raise Exception(f"Undeclared variable {p[0]}")
+            return "undeclared", p[0]
 
     @_('PID "(" PID ")"')
     def identifier(self, p):
         if p[0] in self.symbols and type(self.symbols[p[0]]) != int:
             if p[2] in self.symbols and type(self.symbols[p[2]]) == int:
-                return p[0], p[2]
+                return "array", p[0], ("load", p[2])
             else:
-                raise Exception(f"Undeclared variable {p[2]}")
+                return "array", p[0], ("load", ("undeclared", p[2]))
         else:
             raise Exception(f"Undeclared array {p[0]}")
 
     @_('PID "(" NUM ")"')
     def identifier(self, p):
         if p[0] in self.symbols and type(self.symbols[p[0]]) != int:
-            return p[0], p[2]
+            return "array", p[0], p[2]
         else:
             raise Exception(f"Undeclared array {p[0]}")
 
 
+# sys.tracebacklimit=0
 lex = ImpLexer()
 pars = ImpParser()
 with open(sys.argv[1]) as in_f:
