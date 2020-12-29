@@ -211,7 +211,7 @@ class CodeGenerator:
             if type(expression[1]) == tuple:
                 if expression[1][0] == "undeclared":
                     self.load_variable(expression[1][1], target_reg, declared=False)
-                elif type(expression[1][2]) == tuple:
+                elif expression[1][0] == "array":
                     # TODO out of bounds when variable?
                     self.load_array_at(expression[1][1], expression[1][2], target_reg, second_reg)
             else:
@@ -247,18 +247,18 @@ class CodeGenerator:
 
     def perform_division(self, quotient_register='a', remainder_register='b', dividend_register='c',
                          divisor_register='d', temp_register='e'):
-        # TODO dzielenie przez 1
         start = len(self.code)
         self.code.append(f"RESET {quotient_register}")
         self.code.append(f"RESET {remainder_register}")
         self.code.append(f"JZERO {divisor_register} finish")
         self.code.append(f"ADD {remainder_register} {dividend_register}")
 
-        self.code.append(f"DEC {divisor_register}")
-        self.code.append(f"JZERO {divisor_register} finish")
-        self.code.append(f"INC {divisor_register}")
         self.code.append(f"RESET {dividend_register}")
         self.code.append(f"ADD {dividend_register} {divisor_register}")
+        self.code.append(f"RESET {temp_register}")
+        self.code.append(f"ADD {temp_register} {remainder_register}")
+        self.code.append(f"SUB {temp_register} {dividend_register}")
+        self.code.append(f"JZERO {temp_register} block_start")
         self.code.append(f"RESET {temp_register}")
         self.code.append(f"ADD {temp_register} {dividend_register}")
         self.code.append(f"SUB {temp_register} {remainder_register}")
