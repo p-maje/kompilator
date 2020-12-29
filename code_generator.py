@@ -219,9 +219,24 @@ class CodeGenerator:
                 self.load_variable(expression[1], target_reg)
 
         elif expression[0] == "add" or expression[0] == "sub":
-            self.calculate_expression(expression[1], target_reg, second_reg)
-            self.calculate_expression(expression[2], second_reg, third_reg)
-            self.code.append(f"{expression[0].upper()} {target_reg} {second_reg}")
+            if expression[1][0] == expression[2][0] == "const":
+                if expression[0] == "add":
+                    self.gen_const(expression[1][1] + expression[2][1], target_reg)
+                else:
+                    self.gen_const(expression[1][1] - expression[2][1], target_reg)
+
+            elif expression[1][0] == "const" and expression[1][1] < 12:
+                self.calculate_expression(expression[2], target_reg, second_reg)
+                change = ("INC " if expression[0] == "add" else "DEC ") + target_reg
+                self.code += expression[1][1] * [change]
+            elif expression[2][0] == "const" and expression[2][1] < 12:
+                self.calculate_expression(expression[1], target_reg, second_reg)
+                change = ("INC " if expression[0] == "add" else "DEC ") + target_reg
+                self.code += expression[2][1] * [change]
+            else:
+                self.calculate_expression(expression[1], target_reg, second_reg)
+                self.calculate_expression(expression[2], second_reg, third_reg)
+                self.code.append(f"{expression[0].upper()} {target_reg} {second_reg}")
 
         elif expression[0] == "mul":
             self.calculate_expression(expression[1], second_reg, target_reg)
