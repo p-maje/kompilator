@@ -239,34 +239,48 @@ class CodeGenerator:
                 self.code.append(f"{expression[0].upper()} {target_reg} {second_reg}")
 
         elif expression[0] == "mul":
-            self.calculate_expression(expression[1], second_reg, target_reg)
-            self.calculate_expression(expression[2], third_reg, target_reg)
-            self.code.append(f"RESET {target_reg}")
-            self.code.append(f"JZERO {second_reg} 21")
-            self.code.append(f"JZERO {third_reg} 20")
-            self.code.append(f"ADD {target_reg} {second_reg}")
-            self.code.append(f"SUB {target_reg} {third_reg}")
-            self.code.append(f"JZERO {target_reg} 9")
+            if expression[1][0] == expression[2][0] == "const":
+                self.gen_const(expression[1][1] * expression[2][1], target_reg)
 
-            # if second >= third it's better to do $2 * $3
-            self.code.append(f"RESET {target_reg}")
-            self.code.append(f"JZERO {third_reg} 15")
-            self.code.append(f"JODD {third_reg} 2")
-            self.code.append("JUMP 2")
-            self.code.append(f"ADD {target_reg} {second_reg}")
-            self.code.append(f"SHR {third_reg}")
-            self.code.append(f"SHL {second_reg}")
-            self.code.append("JUMP -6")
+            elif expression[1][0] == "const" and expression[1][1] < 2:
+                if expression[1][1] == 0:
+                    self.code.append(f"RESET {target_reg}")
+                else:
+                    self.calculate_expression(expression[2], target_reg, second_reg)
+            elif expression[2][0] == "const" and expression[2][1] < 2:
+                if expression[2][1] == 0:
+                    self.code.append(f"RESET {target_reg}")
+                else:
+                    self.calculate_expression(expression[1], target_reg, second_reg)
+            else:
+                self.calculate_expression(expression[1], second_reg, target_reg)
+                self.calculate_expression(expression[2], third_reg, target_reg)
+                self.code.append(f"RESET {target_reg}")
+                self.code.append(f"JZERO {second_reg} 21")
+                self.code.append(f"JZERO {third_reg} 20")
+                self.code.append(f"ADD {target_reg} {second_reg}")
+                self.code.append(f"SUB {target_reg} {third_reg}")
+                self.code.append(f"JZERO {target_reg} 9")
 
-            # if second <= third it's better to do $3 * $2
-            self.code.append(f"RESET {target_reg}")
-            self.code.append(f"JZERO {second_reg} 7")
-            self.code.append(f"JODD {second_reg} 2")
-            self.code.append("JUMP 2")
-            self.code.append(f"ADD {target_reg} {third_reg}")
-            self.code.append(f"SHR {second_reg}")
-            self.code.append(f"SHL {third_reg}")
-            self.code.append("JUMP -6")
+                # if second >= third it's better to do $2 * $3
+                self.code.append(f"RESET {target_reg}")
+                self.code.append(f"JZERO {third_reg} 15")
+                self.code.append(f"JODD {third_reg} 2")
+                self.code.append("JUMP 2")
+                self.code.append(f"ADD {target_reg} {second_reg}")
+                self.code.append(f"SHR {third_reg}")
+                self.code.append(f"SHL {second_reg}")
+                self.code.append("JUMP -6")
+
+                # if second <= third it's better to do $3 * $2
+                self.code.append(f"RESET {target_reg}")
+                self.code.append(f"JZERO {second_reg} 7")
+                self.code.append(f"JODD {second_reg} 2")
+                self.code.append("JUMP 2")
+                self.code.append(f"ADD {target_reg} {third_reg}")
+                self.code.append(f"SHR {second_reg}")
+                self.code.append(f"SHL {third_reg}")
+                self.code.append("JUMP -6")
 
         elif expression[0] == "div":
             self.calculate_expression(expression[1], third_reg, second_reg)
