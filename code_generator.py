@@ -168,7 +168,7 @@ class CodeGenerator:
                 self.code.append("JZERO e loop_start")
                 self.code.append("RESET d")
                 self.code.append("ADD d f")
-                self.code.append("INC d") # TUTUAJ
+                self.code.append("INC d")  # TUTUAJ
                 self.code.append("SUB d e")
                 self.code.append("JZERO d finish")
 
@@ -239,48 +239,64 @@ class CodeGenerator:
                 self.code.append(f"{expression[0].upper()} {target_reg} {second_reg}")
 
         elif expression[0] == "mul":
+            const = None
+            expr = None
+
             if expression[1][0] == expression[2][0] == "const":
                 self.gen_const(expression[1][1] * expression[2][1], target_reg)
+                return
 
-            elif expression[1][0] == "const" and expression[1][1] < 2:
-                if expression[1][1] == 0:
+            elif expression[1][0] == "const":
+                const = expression[1][1]
+                expr = expression[2]
+
+            elif expression[2][0] == "const":
+                const = expression[2][1]
+                expr = expression[1]
+
+            if const is not None:
+                if const == 0:
                     self.code.append(f"RESET {target_reg}")
-                else:
-                    self.calculate_expression(expression[2], target_reg, second_reg)
-            elif expression[2][0] == "const" and expression[2][1] < 2:
-                if expression[2][1] == 0:
-                    self.code.append(f"RESET {target_reg}")
-                else:
-                    self.calculate_expression(expression[1], target_reg, second_reg)
-            else:
-                self.calculate_expression(expression[1], second_reg, target_reg)
-                self.calculate_expression(expression[2], third_reg, target_reg)
-                self.code.append(f"RESET {target_reg}")
-                self.code.append(f"JZERO {second_reg} 21")
-                self.code.append(f"JZERO {third_reg} 20")
-                self.code.append(f"ADD {target_reg} {second_reg}")
-                self.code.append(f"SUB {target_reg} {third_reg}")
-                self.code.append(f"JZERO {target_reg} 9")
+                    return
+                elif const == 1:
+                    self.calculate_expression(expr, target_reg, second_reg)
+                    return
+                elif const & (const - 1) == 0:
+                    self.calculate_expression(expr, target_reg, second_reg)
+                    while const > 1:
+                        self.code.append(f"SHL {target_reg}")
+                        const /= 2
+                    return
 
-                # if second >= third it's better to do $2 * $3
-                self.code.append(f"RESET {target_reg}")
-                self.code.append(f"JZERO {third_reg} 15")
-                self.code.append(f"JODD {third_reg} 2")
-                self.code.append("JUMP 2")
-                self.code.append(f"ADD {target_reg} {second_reg}")
-                self.code.append(f"SHR {third_reg}")
-                self.code.append(f"SHL {second_reg}")
-                self.code.append("JUMP -6")
 
-                # if second <= third it's better to do $3 * $2
-                self.code.append(f"RESET {target_reg}")
-                self.code.append(f"JZERO {second_reg} 7")
-                self.code.append(f"JODD {second_reg} 2")
-                self.code.append("JUMP 2")
-                self.code.append(f"ADD {target_reg} {third_reg}")
-                self.code.append(f"SHR {second_reg}")
-                self.code.append(f"SHL {third_reg}")
-                self.code.append("JUMP -6")
+            self.calculate_expression(expression[1], second_reg, target_reg)
+            self.calculate_expression(expression[2], third_reg, target_reg)
+            self.code.append(f"RESET {target_reg}")
+            self.code.append(f"JZERO {second_reg} 21")
+            self.code.append(f"JZERO {third_reg} 20")
+            self.code.append(f"ADD {target_reg} {second_reg}")
+            self.code.append(f"SUB {target_reg} {third_reg}")
+            self.code.append(f"JZERO {target_reg} 9")
+
+            # if second >= third it's better to do $2 * $3
+            self.code.append(f"RESET {target_reg}")
+            self.code.append(f"JZERO {third_reg} 15")
+            self.code.append(f"JODD {third_reg} 2")
+            self.code.append("JUMP 2")
+            self.code.append(f"ADD {target_reg} {second_reg}")
+            self.code.append(f"SHR {third_reg}")
+            self.code.append(f"SHL {second_reg}")
+            self.code.append("JUMP -6")
+
+            # if second <= third it's better to do $3 * $2
+            self.code.append(f"RESET {target_reg}")
+            self.code.append(f"JZERO {second_reg} 7")
+            self.code.append(f"JODD {second_reg} 2")
+            self.code.append("JUMP 2")
+            self.code.append(f"ADD {target_reg} {third_reg}")
+            self.code.append(f"SHR {second_reg}")
+            self.code.append(f"SHL {third_reg}")
+            self.code.append("JUMP -6")
 
         elif expression[0] == "div":
             if expression[1][0] == expression[2][0] == "const":
@@ -298,6 +314,14 @@ class CodeGenerator:
                 else:
                     self.calculate_expression(expression[1], target_reg, second_reg)
 
+            # when divided by a power of two, use shr
+            elif expression[2][0] == "const" and (expression[2][1] & (expression[2][1] - 1) == 0):
+                self.calculate_expression(expression[1], target_reg, second_reg)
+                n = expression[2][1]
+                while n > 1:
+                    self.code.append(f"SHR {target_reg}")
+                    n /= 2
+
             else:
                 self.calculate_expression(expression[1], third_reg, second_reg)
                 self.calculate_expression(expression[2], fourth_reg, second_reg)
@@ -313,11 +337,15 @@ class CodeGenerator:
             elif expression[1][0] == "const" and expression[1][1] == 0:
                 self.code.append(f"RESET {target_reg}")
 
-            elif expression[2][0] == "const" and expression[2][1] < 2:
-                if expression[2][1] == 0:
+            elif expression[2][0] == "const" and expression[2][1] < 3:
+                if expression[2][1] < 2:
                     self.code.append(f"RESET {target_reg}")
                 else:
-                    self.calculate_expression(expression[1], target_reg, second_reg)
+                    self.calculate_expression(expression[1], second_reg, target_reg)
+                    self.code.append(f"RESET {target_reg}")
+                    self.code.append(f"JODD {second_reg} 2")
+                    self.code.append(f"JUMP 2")
+                    self.code.append(f"INC {target_reg}")
 
             else:
                 self.calculate_expression(expression[1], third_reg, second_reg)
@@ -377,45 +405,103 @@ class CodeGenerator:
             self.code[i] = self.code[i].replace('finish', str(end - i))
 
     def check_condition(self, condition, first_reg='a', second_reg='b', third_reg='c'):
-        self.calculate_expression(condition[1], first_reg, third_reg)
-        self.calculate_expression(condition[2], second_reg, third_reg)
+        if condition[1][0] == "const" and condition[2][0] == "const":
+            if condition[0] == "le":
+                if not condition[1][1] <= condition[2][1]:
+                    self.code.append(f"JUMP finish")
 
-        if condition[0] == "le":
-            self.code.append(f"SUB {first_reg} {second_reg}")
-            self.code.append(f"JZERO {first_reg} 2")
-            self.code.append(f"JUMP finish")
+            elif condition[0] == "ge":
+                if not condition[1][1] >= condition[2][1]:
+                    self.code.append(f"JUMP finish")
 
-        elif condition[0] == "ge":
-            self.code.append(f"SUB {second_reg} {first_reg}")
-            self.code.append(f"JZERO {second_reg} 2")
-            self.code.append(f"JUMP finish")
+            elif condition[0] == "lt":
+                if not condition[1][1] < condition[2][1]:
+                    self.code.append(f"JUMP finish")
 
-        elif condition[0] == "lt":
-            self.code.append(f"SUB {second_reg} {first_reg}")
-            self.code.append(f"JZERO {second_reg} finish")
+            elif condition[0] == "gt":
+                if not condition[1][1] > condition[2][1]:
+                    self.code.append(f"JUMP finish")
 
-        elif condition[0] == "gt":
-            self.code.append(f"SUB {first_reg} {second_reg}")
-            self.code.append(f"JZERO {first_reg} finish")
+            elif condition[0] == "eq":
+                if not condition[1][1] == condition[2][1]:
+                    self.code.append(f"JUMP finish")
 
-        elif condition[0] == "eq":
-            self.code.append(f"RESET {third_reg}")
-            self.code.append(f"ADD {third_reg} {first_reg}")
-            self.code.append(f"SUB {first_reg} {second_reg}")
-            self.code.append(f"JZERO {first_reg} 2")
-            self.code.append(f"JUMP finish")
-            self.code.append(f"SUB {second_reg} {third_reg}")
-            self.code.append(f"JZERO {second_reg} 2")
-            self.code.append(f"JUMP finish")
+            elif condition[0] == "ne":
+                if not condition[1][1] != condition[2][1]:
+                    self.code.append(f"JUMP finish")
 
-        elif condition[0] == "ne":
-            self.code.append(f"RESET {third_reg}")
-            self.code.append(f"ADD {third_reg} {first_reg}")
-            self.code.append(f"SUB {first_reg} {second_reg}")
-            self.code.append(f"JZERO {first_reg} 2")
-            self.code.append(f"JUMP 3")
-            self.code.append(f"SUB {second_reg} {third_reg}")
-            self.code.append(f"JZERO {second_reg} finish")
+        elif condition[1][0] == "const" and condition[1][1] == 0:
+            if condition[0] == "le":
+                pass
+
+            elif condition[0] == "lt":
+                self.code.append(f"JUMP finish")
+
+            elif condition[0] == "ge" or condition[0] == "eq":
+                self.calculate_expression(condition[2], first_reg, second_reg)
+                self.code.append(f"JZERO {first_reg} 2")
+                self.code.append("JUMP finish")
+
+            elif condition[0] == "gt" or condition[0] == "ne":
+                self.calculate_expression(condition[2], first_reg, second_reg)
+                self.code.append(f"JZERO {first_reg} finish")
+
+        elif condition[2][0] == "const" and condition[2][1] == 0:
+            if condition[0] == "ge":
+                pass
+
+            elif condition[0] == "lt":
+                self.code.append(f"JUMP finish")
+
+            elif condition[0] == "le" or condition[0] == "eq":
+                self.calculate_expression(condition[1], first_reg, second_reg)
+                self.code.append(f"JZERO {first_reg} 2")
+                self.code.append("JUMP finish")
+
+            elif condition[0] == "gt" or condition[0] == "ne":
+                self.calculate_expression(condition[1], first_reg, second_reg)
+                self.code.append(f"JZERO {first_reg} finish")
+
+        else:
+            self.calculate_expression(condition[1], first_reg, third_reg)
+            self.calculate_expression(condition[2], second_reg, third_reg)
+
+            if condition[0] == "le":
+                self.code.append(f"SUB {first_reg} {second_reg}")
+                self.code.append(f"JZERO {first_reg} 2")
+                self.code.append(f"JUMP finish")
+
+            elif condition[0] == "ge":
+                self.code.append(f"SUB {second_reg} {first_reg}")
+                self.code.append(f"JZERO {second_reg} 2")
+                self.code.append(f"JUMP finish")
+
+            elif condition[0] == "lt":
+                self.code.append(f"SUB {second_reg} {first_reg}")
+                self.code.append(f"JZERO {second_reg} finish")
+
+            elif condition[0] == "gt":
+                self.code.append(f"SUB {first_reg} {second_reg}")
+                self.code.append(f"JZERO {first_reg} finish")
+
+            elif condition[0] == "eq":
+                self.code.append(f"RESET {third_reg}")
+                self.code.append(f"ADD {third_reg} {first_reg}")
+                self.code.append(f"SUB {first_reg} {second_reg}")
+                self.code.append(f"JZERO {first_reg} 2")
+                self.code.append(f"JUMP finish")
+                self.code.append(f"SUB {second_reg} {third_reg}")
+                self.code.append(f"JZERO {second_reg} 2")
+                self.code.append(f"JUMP finish")
+
+            elif condition[0] == "ne":
+                self.code.append(f"RESET {third_reg}")
+                self.code.append(f"ADD {third_reg} {first_reg}")
+                self.code.append(f"SUB {first_reg} {second_reg}")
+                self.code.append(f"JZERO {first_reg} 2")
+                self.code.append(f"JUMP 3")
+                self.code.append(f"SUB {second_reg} {third_reg}")
+                self.code.append(f"JZERO {second_reg} finish")
 
     def load_array_at(self, array, index, reg1, reg2):
         self.load_array_address_at(array, index, reg1, reg2)
