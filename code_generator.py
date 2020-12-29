@@ -42,7 +42,7 @@ class CodeGenerator:
                 register1 = 'b'
                 if type(target) == tuple:
                     if target[0] == "undeclared":
-                        self.load_variable_address(target[1], register, declared=False)
+                        raise Exception(f"Reading to iterator {target[1]}")
                     elif target[0] == "array":
                         self.load_array_address_at(target[1], target[2], register, register1)
                 else:
@@ -58,7 +58,7 @@ class CodeGenerator:
                 self.calculate_expression(expression)
                 if type(target) == tuple:
                     if target[0] == "undeclared":
-                        self.load_variable_address(target[1], second_reg)
+                        raise Exception(f"Assigning to iterator {target[1]}")
                     elif target[0] == "array":
                         self.load_array_address_at(target[1], target[2], second_reg, third_reg)
                 else:
@@ -168,6 +168,7 @@ class CodeGenerator:
                 self.code.append("JZERO e loop_start")
                 self.code.append("RESET d")
                 self.code.append("ADD d f")
+                self.code.append("INC d") # TUTUAJ
                 self.code.append("SUB d e")
                 self.code.append("JZERO d finish")
 
@@ -366,10 +367,10 @@ class CodeGenerator:
             self.code.append(f"LOAD {reg} {reg}")
 
     def load_variable_address(self, name, reg, declared=True):
-        if name in self.iterators and name == self.iterators[-1]:
-            raise Exception(f"Assigning to iterator {name}")
         if declared or name in self.iterators:
             address = self.symbols.get_address(name)
             self.gen_const(address, reg)
+            if self.iterators and name == self.iterators[-1]:
+                self.code.append(f"STORE f {reg}")
         else:
             raise Exception(f"Undeclared variable {name}")
