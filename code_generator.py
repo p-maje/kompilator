@@ -224,16 +224,33 @@ class CodeGenerator:
             self.code.append(f"{expression[0].upper()} {target_reg} {second_reg}")
 
         elif expression[0] == "mul":
-            # TODO order optimization
             self.calculate_expression(expression[1], second_reg, target_reg)
             self.calculate_expression(expression[2], third_reg, target_reg)
             self.code.append(f"RESET {target_reg}")
-            self.code.append(f"JZERO {third_reg} 7")
+            self.code.append(f"JZERO {second_reg} 21")
+            self.code.append(f"JZERO {third_reg} 20")
+            self.code.append(f"ADD {target_reg} {second_reg}")
+            self.code.append(f"SUB {target_reg} {third_reg}")
+            self.code.append(f"JZERO {target_reg} 9")
+
+            # if second >= third it's better to do $2 * $3
+            self.code.append(f"RESET {target_reg}")
+            self.code.append(f"JZERO {third_reg} 15")
             self.code.append(f"JODD {third_reg} 2")
             self.code.append("JUMP 2")
             self.code.append(f"ADD {target_reg} {second_reg}")
             self.code.append(f"SHR {third_reg}")
             self.code.append(f"SHL {second_reg}")
+            self.code.append("JUMP -6")
+
+            # if second <= third it's better to do $3 * $2
+            self.code.append(f"RESET {target_reg}")
+            self.code.append(f"JZERO {second_reg} 7")
+            self.code.append(f"JODD {second_reg} 2")
+            self.code.append("JUMP 2")
+            self.code.append(f"ADD {target_reg} {third_reg}")
+            self.code.append(f"SHR {second_reg}")
+            self.code.append(f"SHL {third_reg}")
             self.code.append("JUMP -6")
 
         elif expression[0] == "div":
