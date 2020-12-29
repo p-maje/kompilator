@@ -283,14 +283,46 @@ class CodeGenerator:
                 self.code.append("JUMP -6")
 
         elif expression[0] == "div":
-            self.calculate_expression(expression[1], third_reg, second_reg)
-            self.calculate_expression(expression[2], fourth_reg, second_reg)
-            self.perform_division(target_reg, second_reg, third_reg, fourth_reg, fifth_reg)
+            if expression[1][0] == expression[2][0] == "const":
+                if expression[2][1] > 0:
+                    self.gen_const(expression[1][1] // expression[2][1], target_reg)
+                else:
+                    self.code.append(f"RESET {target_reg}")
+
+            elif expression[1][0] == "const" and expression[1][1] == 0:
+                self.code.append(f"RESET {target_reg}")
+
+            elif expression[2][0] == "const" and expression[2][1] < 2:
+                if expression[2][1] == 0:
+                    self.code.append(f"RESET {target_reg}")
+                else:
+                    self.calculate_expression(expression[1], target_reg, second_reg)
+
+            else:
+                self.calculate_expression(expression[1], third_reg, second_reg)
+                self.calculate_expression(expression[2], fourth_reg, second_reg)
+                self.perform_division(target_reg, second_reg, third_reg, fourth_reg, fifth_reg)
 
         elif expression[0] == "mod":
-            self.calculate_expression(expression[1], third_reg, second_reg)
-            self.calculate_expression(expression[2], fourth_reg, second_reg)
-            self.perform_division(second_reg, target_reg, third_reg, fourth_reg, fifth_reg)
+            if expression[1][0] == expression[2][0] == "const":
+                if expression[2][1] > 0:
+                    self.gen_const(expression[1][1] % expression[2][1], target_reg)
+                else:
+                    self.code.append(f"RESET {target_reg}")
+
+            elif expression[1][0] == "const" and expression[1][1] == 0:
+                self.code.append(f"RESET {target_reg}")
+
+            elif expression[2][0] == "const" and expression[2][1] < 2:
+                if expression[2][1] == 0:
+                    self.code.append(f"RESET {target_reg}")
+                else:
+                    self.calculate_expression(expression[1], target_reg, second_reg)
+
+            else:
+                self.calculate_expression(expression[1], third_reg, second_reg)
+                self.calculate_expression(expression[2], fourth_reg, second_reg)
+                self.perform_division(second_reg, target_reg, third_reg, fourth_reg, fifth_reg)
 
     def perform_division(self, quotient_register='a', remainder_register='b', dividend_register='c',
                          divisor_register='d', temp_register='e'):
