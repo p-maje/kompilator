@@ -1,3 +1,6 @@
+from symbol_table import Variable
+
+
 class CodeGenerator:
     def __init__(self, commands, symbols):
         self.commands = commands
@@ -23,7 +26,10 @@ class CodeGenerator:
                         elif value[1][0] == "array":
                             self.load_array_address_at(value[1][1], value[1][2], register, register1)
                     else:
-                        self.load_variable_address(value[1], register)
+                        if self.symbols[value[1]].initialized:
+                            self.load_variable_address(value[1], register)
+                        else:
+                            raise Exception(f"Use of uninitialized variable {value[1]}")
 
                 elif value[0] == "const":
                     address = self.symbols.get_const(value[1])
@@ -42,11 +48,16 @@ class CodeGenerator:
                 register1 = 'b'
                 if type(target) == tuple:
                     if target[0] == "undeclared":
-                        raise Exception(f"Reading to iterator {target[1]}")
+                        if target[1] in self.symbols.iterators:
+                            raise Exception(f"Reading to iterator {target[1]}")
+                        else:
+                            raise Exception(f"Reading to undeclared variable {target[1]}")
                     elif target[0] == "array":
+                        # TODO arrays initialized?
                         self.load_array_address_at(target[1], target[2], register, register1)
                 else:
                     self.load_variable_address(target, register)
+                    self.symbols[target].initialized = True
                 self.code.append(f"GET {register}")
 
             elif command[0] == "assign":
@@ -58,11 +69,18 @@ class CodeGenerator:
                 self.calculate_expression(expression)
                 if type(target) == tuple:
                     if target[0] == "undeclared":
-                        raise Exception(f"Assigning to iterator {target[1]}")
+                        if target[1] in self.symbols.iterators:
+                            raise Exception(f"Assigning to iterator {target[1]}")
+                        else:
+                            raise Exception(f"Assigning to undeclared variable {target[1]}")
                     elif target[0] == "array":
                         self.load_array_address_at(target[1], target[2], second_reg, third_reg)
                 else:
-                    self.load_variable_address(target, second_reg)
+                    if type(self.symbols[target]) == Variable:
+                        self.load_variable_address(target, second_reg)
+                        self.symbols[target].initialized = True
+                    else:
+                        raise Exception(f"Assigning to array {target} with no index provided")
                 self.code.append(f"STORE {target_reg} {second_reg}")
 
             elif command[0] == "if":
@@ -114,7 +132,6 @@ class CodeGenerator:
                     self.code.append(f"STORE f e")
 
                 iterator = command[1]
-                self.iterators.append(iterator)
                 address, bound_address = self.symbols.add_iterator(iterator)
 
                 self.calculate_expression(command[3], 'e')
@@ -125,6 +142,8 @@ class CodeGenerator:
                 self.calculate_expression(command[2], 'f')
                 self.gen_const(address, 'd')
                 self.code.append("STORE f d")
+
+                self.iterators.append(iterator)
 
                 condition_start = len(self.code)
                 self.code.append("SUB e f")
@@ -153,7 +172,6 @@ class CodeGenerator:
                     self.code.append(f"STORE f e")
 
                 iterator = command[1]
-                self.iterators.append(iterator)
                 address, bound_address = self.symbols.add_iterator(iterator)
 
                 self.calculate_expression(command[3], 'e')
@@ -163,6 +181,8 @@ class CodeGenerator:
                 self.calculate_expression(command[2], 'f')
                 self.gen_const(address, 'd')
                 self.code.append("STORE f d")
+
+                self.iterators.append(iterator)
 
                 condition_start = len(self.code)
                 self.code.append("JZERO e loop_start")
@@ -216,7 +236,10 @@ class CodeGenerator:
                     # TODO out of bounds when variable?
                     self.load_array_at(expression[1][1], expression[1][2], target_reg, second_reg)
             else:
-                self.load_variable(expression[1], target_reg)
+                if self.symbols[expression[1]].initialized:
+                    self.load_variable(expression[1], target_reg)
+                else:
+                    raise Exception(f"Use of uninitialized variable {expression[1]}")
 
         elif expression[0] == "add" or expression[0] == "sub":
             if expression[1][0] == expression[2][0] == "const":
@@ -515,15 +538,17 @@ class CodeGenerator:
             if type(index[1]) == tuple:
                 self.load_variable(index[1][1], reg1, declared=False)
             else:
+                if not self.symbols[index[1]].initialized:
+                    raise Exception(f"Trying to use {array}({index[1]}) where variable {index[1]} is uninitialized")
                 self.load_variable(index[1], reg1)
-            var = self.symbols.get_address(array)
+            var = self.symbols.get_variable(array)
             self.gen_const(var.first_index, reg2)
             self.code.append(f"SUB {reg1} {reg2}")
             self.gen_const(var.memory_offset, reg2)
             self.code.append(f"ADD {reg1} {reg2}")
 
     def load_variable(self, name, reg, declared=True):
-        if not declared and name == self.iterators[-1]:
+        if not declared and self.iterators and name == self.iterators[-1]:
             self.code.append(f"RESET {reg}")
             self.code.append(f"ADD {reg} f")
         else:

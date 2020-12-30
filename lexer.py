@@ -1,5 +1,5 @@
 from sly import Lexer, Parser
-from symbol_table import SymbolTable
+from symbol_table import SymbolTable, Array, Variable
 from code_generator import CodeGenerator
 import sys
 
@@ -10,7 +10,10 @@ class ImpLexer(Lexer):
     literals = {'+', '-', '*', '/', '%', ',', ':', ';', '(', ')'}
     ignore = ' \t'
     ignore_comment = r'\[[^\]]*\]'
-    ignore_newline = r'\n+'
+
+    @_(r'\n+')
+    def ignore_newline(self, t):
+        self.lineno += len(t.value)
 
     DECLARE = r"DECLARE"
     BEGIN = r"BEGIN"
@@ -51,6 +54,9 @@ class ImpLexer(Lexer):
     def NUM(self, t):
         t.value = int(t.value)
         return t
+
+    def error(self, t):
+        raise Exception(f"Illegal character '{t.value[0]}'")
 
 
 class ImpParser(Parser):
@@ -177,7 +183,6 @@ class ImpParser(Parser):
 
     @_('PID')
     def identifier(self, p):
-        # TODO this is a mess also
         if p[0] in self.symbols:
             return p[0]
         else:
@@ -185,8 +190,8 @@ class ImpParser(Parser):
 
     @_('PID "(" PID ")"')
     def identifier(self, p):
-        if p[0] in self.symbols and type(self.symbols[p[0]]) != int:
-            if p[2] in self.symbols and type(self.symbols[p[2]]) == int:
+        if p[0] in self.symbols and type(self.symbols[p[0]]) == Array:
+            if p[2] in self.symbols and type(self.symbols[p[2]]) == Variable:
                 return "array", p[0], ("load", p[2])
             else:
                 return "array", p[0], ("load", ("undeclared", p[2]))
@@ -195,20 +200,24 @@ class ImpParser(Parser):
 
     @_('PID "(" NUM ")"')
     def identifier(self, p):
-        if p[0] in self.symbols and type(self.symbols[p[0]]) != int:
+        if p[0] in self.symbols and type(self.symbols[p[0]]) == Array:
             return "array", p[0], p[2]
         else:
             raise Exception(f"Undeclared array {p[0]}")
 
+    def error(self, token):
+        raise Exception(f"Syntax error: '{token.value}' in line {token.lineno}")
 
-# sys.tracebacklimit=0
+sys.tracebacklimit=0
 lex = ImpLexer()
 pars = ImpParser()
 with open(sys.argv[1]) as in_f:
     text = in_f.read()
+
 pars.parse(lex.tokenize(text))
 code_gen = pars.code
 code_gen.gen_code()
 with open(sys.argv[2], 'w') as out_f:
     for line in code_gen.code:
         print(line, file=out_f)
+
