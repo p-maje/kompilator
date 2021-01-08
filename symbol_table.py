@@ -25,9 +25,11 @@ class Variable:
 
 
 class Iterator:
-    def __init__(self, memory_offset, limit_address):
-        self.memory_offset = memory_offset
-        self.limit_address = limit_address
+    def __init__(self, memory_offset, is_downto):
+        self.is_downto = is_downto
+        self.memory_offset = memory_offset  # stores the value, only stored when theres an embedded loop
+        self.limit_address = memory_offset + 1  # stores the upper bound + 1 so that current_val = upper_bound + 1 - iters_left
+        self.iters_left_address = memory_offset + 2  # stores iterations left, only stored when theres an embedded loop
 
     def __repr__(self):
         return f"iterator at {self.memory_offset}"
@@ -59,12 +61,11 @@ class SymbolTable(dict):
         self.memory_offset += 1
         return self.memory_offset - 1
 
-    def add_iterator(self, name):
-        last_address = self.memory_offset
-        self.memory_offset += 1
-        self.iterators.setdefault(name, Iterator(self.memory_offset, last_address))
-        self.memory_offset += 1
-        return self.memory_offset - 1, last_address
+    def add_iterator(self, name, is_downto):
+        iterator = Iterator(self.memory_offset, is_downto)
+        self.memory_offset += 3
+        self.iterators.setdefault(name, iterator)
+        return iterator
 
     def is_iterator(self, value):
         return value in self.iterators
@@ -94,8 +95,7 @@ class SymbolTable(dict):
 
     def get_iterator(self, name):
         if name in self.iterators:
-            iterator = self.iterators[name]
-            return iterator.memory_offset, iterator.limit_address
+            return self.iterators[name]
 
     def get_const(self, val):
         if val in self.consts:
