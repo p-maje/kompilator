@@ -457,7 +457,7 @@ class CodeGenerator:
             if condition[0] == "le":
                 pass
 
-            elif condition[0] == "lt":
+            elif condition[0] == "gt":
                 self.code.append(f"JUMP finish")
 
             elif condition[0] == "ge" or condition[0] == "eq":
@@ -465,7 +465,7 @@ class CodeGenerator:
                 self.code.append(f"JZERO {first_reg} 2")
                 self.code.append("JUMP finish")
 
-            elif condition[0] == "gt" or condition[0] == "ne":
+            elif condition[0] == "lt" or condition[0] == "ne":
                 self.calculate_expression(condition[2], first_reg, second_reg)
                 self.code.append(f"JZERO {first_reg} finish")
 
