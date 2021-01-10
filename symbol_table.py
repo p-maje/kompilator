@@ -1,5 +1,6 @@
 class Array:
-    def __init__(self, memory_offset, first_index, last_index):
+    def __init__(self, name, memory_offset, first_index, last_index):
+        self.name = name
         self.memory_offset = memory_offset
         self.first_index = first_index
         self.last_index = last_index
@@ -11,7 +12,7 @@ class Array:
         if self.first_index <= index <= self.last_index:
             return self.memory_offset + index - self.first_index
         else:
-            raise Exception("Index out of range")
+            raise Exception(f"Index {index} out of range for array {self.name}")
 
 
 class Variable:
@@ -51,7 +52,7 @@ class SymbolTable(dict):
             raise Exception(f"Redeclaration of {name}")
         elif begin > end:
             raise Exception(f"Wrong range in declaration of {name}")
-        self.setdefault(name, Array(self.memory_offset, begin, end))
+        self.setdefault(name, Array(name, self.memory_offset, begin, end))
         self.memory_offset += (end - begin) + 1
 
     def add_const(self, value):

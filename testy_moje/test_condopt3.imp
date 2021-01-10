@@ -1,0 +1,29 @@
+[
+    test_condopt3.imp – zwykłe warunki z jedną stałą
+    > 0
+    > 0
+    > 0
+]
+DECLARE
+    k
+BEGIN
+    k := 1;
+    IF 1 <= k THEN
+    WRITE 0;
+    ENDIF
+	IF 1 > k THEN
+    WRITE 1;
+    ENDIF
+    IF 1 >= k THEN
+    WRITE 0;
+    ENDIF
+    IF 1 = k THEN
+    WRITE 0;
+    ENDIF
+    IF 1 < k THEN
+    WRITE 1;
+    ENDIF
+    IF 1 != k THEN
+    WRITE 1;
+    ENDIF
+END

@@ -1,0 +1,26 @@
+[
+    test_condopt.imp – warunki z samymi stałymi
+    > 0
+    > 0
+    > 0
+]
+BEGIN
+    IF 1 < 1 THEN
+    WRITE 1;
+    ENDIF
+	IF 1 <= 1 THEN
+    WRITE 0;
+    ENDIF
+    IF 1 > 1 THEN
+    WRITE 1;
+    ENDIF
+    IF 1 >= 1 THEN
+    WRITE 0;
+    ENDIF
+    IF 1 = 1 THEN
+    WRITE 0;
+    ENDIF
+    IF 1 != 1 THEN
+    WRITE 1;
+    ENDIF
+END

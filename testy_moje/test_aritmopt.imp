@@ -1,0 +1,54 @@
+[
+    test_aritmopt.imp – działania z dwoma stałymi
+    > 1
+    > 2
+    > 3
+    > 4
+    > 5
+    > 6
+    > 7
+    > 8
+]
+DECLARE
+    k
+BEGIN
+    k := 1 + 3;
+    IF k = 4 THEN
+    WRITE 1;
+    ENDIF
+
+    k := 0 - 1;
+    IF k = 0 THEN
+    WRITE 2;
+    ENDIF
+
+    k := 1 - 0;
+    IF k = 1 THEN
+    WRITE 3;
+    ENDIF
+
+    k := 2 * 2;
+    IF k = 4 THEN
+    WRITE 4;
+    ENDIF
+
+    k := 2 / 2;
+    IF k = 1 THEN
+    WRITE 5;
+    ENDIF
+
+    k := 2 / 0;
+    IF k = 0 THEN
+    WRITE 6;
+    ENDIF
+
+    k := 3 % 2;
+    IF k = 1 THEN
+    WRITE 7;
+    ENDIF
+
+    k := 2 % 0;
+    IF k = 0 THEN
+    WRITE 8;
+    ENDIF
+END

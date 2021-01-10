@@ -1,0 +1,98 @@
+[
+    test_aritmopt2.imp – szczególne działania z jedną stałą
+    > (kolejno od 1 do 18)
+]
+DECLARE
+    k, b
+BEGIN
+    b := 2;
+    k := b + 3;
+    IF k = 5 THEN
+    WRITE 1;
+    ENDIF
+
+    k := 5 + b;
+    IF k = 7 THEN
+    WRITE 2;
+    ENDIF
+
+    k := b - 3;
+    IF k = 0 THEN
+    WRITE 3;
+    ENDIF
+
+    k := 0 - b;
+    IF k = 0 THEN
+    WRITE 4;
+    ENDIF
+
+    k := b * 0;
+    IF k = 0 THEN
+    WRITE 5;
+    ENDIF
+
+    k := 0 * b;
+    IF k = 0 THEN
+    WRITE 6;
+    ENDIF
+
+    k := b * 1;
+    IF k = 2 THEN
+    WRITE 7;
+    ENDIF
+
+    k := 1 * b;
+    IF k = 2 THEN
+    WRITE 8;
+    ENDIF
+
+    k := b * 4;
+    IF k = 8 THEN
+    WRITE 9;
+    ENDIF
+
+    k := 8 * b;
+    IF k = 16 THEN
+    WRITE 10;
+    ENDIF
+
+    k := 0 / b;
+    IF k = 0 THEN
+    WRITE 11;
+    ENDIF
+
+    k := b / 0;
+    IF k = 0 THEN
+    WRITE 12;
+    ENDIF
+
+    k := b / 1;
+    IF k = 2 THEN
+    WRITE 13;
+    ENDIF
+
+    k := b / 2;
+    IF k = 1 THEN
+    WRITE 14;
+    ENDIF
+
+    k := 0 % b;
+    IF k = 0 THEN
+    WRITE 15;
+    ENDIF
+
+    k := b % 0;
+    IF k = 0 THEN
+    WRITE 16;
+    ENDIF
+
+    k := b % 1;
+    IF k = 0 THEN
+    WRITE 17;
+    ENDIF
+
+    k := b % 2;
+    IF k = 0 THEN
+    WRITE 18;
+    ENDIF
+END

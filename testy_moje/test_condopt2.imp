@@ -1,0 +1,29 @@
+[
+    test_condopt2.imp – szczególne warunki z jedną stałą
+    > 0
+    > 0
+    > 0
+]
+DECLARE
+    k
+BEGIN
+    k := 0;
+    IF 0 <= k THEN
+    WRITE 0;
+    ENDIF
+	IF 0 > k THEN
+    WRITE 1;
+    ENDIF
+    IF 0 >= k THEN
+    WRITE 0;
+    ENDIF
+    IF 0 = k THEN
+    WRITE 0;
+    ENDIF
+    IF 0 < k THEN
+    WRITE 1;
+    ENDIF
+    IF 0 != k THEN
+    WRITE 1;
+    ENDIF
+END

@@ -1,0 +1,59 @@
+[
+    test_aritmopt3.imp – zwykłe działania z jedną stałą
+    > (kolejno od 1 do 10)
+]
+DECLARE
+    k, b
+BEGIN
+    b := 2;
+    k := b + 12;
+    IF k = 14 THEN
+    WRITE 1;
+    ENDIF
+
+    k := 15 + b;
+    IF k = 17 THEN
+    WRITE 2;
+    ENDIF
+
+    k := b - 12;
+    IF k = 0 THEN
+    WRITE 3;
+    ENDIF
+
+    k := 15 - b;
+    IF k = 13 THEN
+    WRITE 4;
+    ENDIF
+
+    k := b * 5;
+    IF k = 10 THEN
+    WRITE 5;
+    ENDIF
+
+    k := 3 * b;
+    IF k = 6 THEN
+    WRITE 6;
+    ENDIF
+
+    k := 1 / b;
+    IF k = 0 THEN
+    WRITE 7;
+    ENDIF
+
+    b := 6;
+    k := b / 3;
+    IF k = 2 THEN
+    WRITE 8;
+    ENDIF
+
+    k := b % 5;
+    IF k = 1 THEN
+    WRITE 9;
+    ENDIF
+
+    k := 8 % b;
+    IF k = 2 THEN
+    WRITE 10;
+    ENDIF
+END
