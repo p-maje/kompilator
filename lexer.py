@@ -1,6 +1,9 @@
 from sly import Lexer, Parser
+
+from assem import AssemblyGenerator
 from symbol_table import SymbolTable, Array, Variable
 from code_generator import CodeGenerator
+from intermediate import IntermediateCodeGenerator
 import sys
 
 
@@ -63,10 +66,12 @@ class ImpParser(Parser):
     tokens = ImpLexer.tokens
     symbols = SymbolTable()
     code = None
+    inter = None
 
     @_('DECLARE declarations BEGIN commands END', 'BEGIN commands END')
     def program(self, p):
         self.code = CodeGenerator(p.commands, self.symbols)
+        self.inter = IntermediateCodeGenerator(p.commands, self.symbols)
         return self.code
 
     @_('declarations "," PID', 'PID')
@@ -215,9 +220,24 @@ with open(sys.argv[1]) as in_f:
     text = in_f.read()
 
 pars.parse(lex.tokenize(text))
-code_gen = pars.code
+inter = pars.inter
+inter.generate_intermediate_code()
+# for c in inter.code:
+#     print(c)
+# print()
+inter.divide_into_blocks()
+# for i, b in enumerate(inter.blocks):
+#     for c in b.commands:
+#         print(i, c)
+code_gen = AssemblyGenerator(inter.blocks, inter.symbols)
 code_gen.gen_code()
 with open(sys.argv[2], 'w') as out_f:
     for line in code_gen.code:
         print(line, file=out_f)
+# code_gen = pars.code
+# code_gen.gen_code()
+# with open(sys.argv[2], 'w') as out_f:
+#     for line in code_gen.code:
+#         print(line, file=out_f)
+
 

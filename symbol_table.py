@@ -89,7 +89,10 @@ class SymbolTable(dict):
 
     def get_address(self, target):
         if type(target) == str:
-            return self.get_variable(target).memory_offset
+            if target.endswith('*'):
+                return self.get_variable(target[:-1]).limit_address
+            else:
+                return self.get_variable(target).memory_offset
         else:
             return self.get_array_at(target[0], target[1])
 
