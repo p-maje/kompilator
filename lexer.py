@@ -226,6 +226,8 @@ inter.generate_intermediate_code()
 #     print(c)
 # print()
 inter.divide_into_blocks()
+inter.simplify_block(inter.blocks[0])
+n = inter.gen_nextuse()
 # for i, b in enumerate(inter.blocks):
 #     for c in b.commands:
 #         print(i, c)

@@ -8,6 +8,27 @@ class CodeBlock:
         self.code = []
 
 
+class DAGNode:
+    def __init__(self, operator):
+        self.op = operator
+        self.children = []
+        self.attached_vars = set()
+        self.killed = False
+        self.converted = False
+
+    def __eq__(self, other):
+        return self.op == other.op and self.children == other.children and not self.killed and not other.killed
+
+    def __hash__(self):
+        return hash(repr(self))
+
+    def __repr__(self):
+        base = f"({self.op}"
+        for c in self.children:
+            base += f" {c}"
+        base += ")"
+        return base
+
 class IntermediateCodeGenerator:
     def __init__(self, commands, symbols):
         self.commands = commands
@@ -292,6 +313,271 @@ class IntermediateCodeGenerator:
         self.blocks = [CodeBlock(s1, self.code[s1:s2]) for s1, s2 in zip(block_starts, block_starts[1:])]
         last_block = block_starts[-1]
         self.blocks.append(CodeBlock(last_block, self.code[last_block:]))
+
+    def simplify_block(self, block):
+        last_defs = {}
+        nodes = []
+        for code in block.commands:
+            if code[0] == "copy":
+                if isinstance(code[1], tuple):
+                    node = DAGNode("[]=")
+                    nodes.append(node)
+                    base_address = self.symbols.get_address(code[1][0])
+                    base_index = self.symbols.get_variable(code[1][0]).first_index
+                    index = code[1][1]
+                    if isinstance(index, int):
+                        address = base_address + index - base_index
+                        if address not in last_defs:
+                            last_defs[address] = DAGNode(address)
+                        node.children.append(last_defs[address])
+                    else:
+                        for e in [base_address, base_index, index]:
+                            if e not in last_defs:
+                                last_defs[e] = DAGNode(e)
+                        subnode = DAGNode("sub")
+                        subnode.children
+                        node.children.append(last_defs[e])
+                    if isinstance(code[2], tuple):
+                        subnode = DAGNode("=[]")
+                        base_address = self.symbols.get_address(code[2][0])
+                        base_index = self.symbols.get_variable(code[2][0]).first_index
+                        index = code[2][1]
+                        for e in [base_address, base_index, index]:
+                            if e not in last_defs:
+                                last_defs[e] = DAGNode(e)
+                            subnode.children.append(last_defs[e])
+                        for n in last_defs.values():
+                            if n == subnode:
+                                subnode = n
+                                break
+                        node.children.append(subnode)
+                    else:
+                        if code[2] not in last_defs:
+                            last_defs[code[2]] = DAGNode(code[2])
+                        node.children.append(last_defs[code[2]])
+                    for n in last_defs.values():
+                        if n.op == "=[]" and n.children[0] == last_defs[base_address]:
+                            n.killed = True
+                else:
+                    if isinstance(code[2], tuple):
+                        node = DAGNode("=[]")
+                        base_address = self.symbols.get_address(code[2][0])
+                        base_index = self.symbols.get_variable(code[2][0]).first_index
+                        for e in [base_address, base_index, code[2][1]]:
+                            if e not in last_defs:
+                                last_defs[e] = DAGNode(e)
+                            node.children.append(last_defs[e])
+                        if code[1] in last_defs:
+                            last_defs[code[1]].attached_vars.remove(code[1])
+                        last_defs[code[1]] = node
+                        last_defs[code[1]].attached_vars.add(code[1])
+                    else:
+                        if code[2] not in last_defs:
+                            last_defs[code[2]] = DAGNode(code[2])
+                        if code[1] in last_defs:
+                            last_defs[code[1]].attached_vars.remove(code[1])
+                        last_defs[code[1]] = last_defs[code[2]]
+                        last_defs[code[1]].attached_vars.add(code[1])
+
+            elif code[0] == "assign":
+                if isinstance(code[1], tuple):
+                    node = DAGNode("[]=")
+                    base_address = self.symbols.get_address(code[1][0])
+                    base_index = self.symbols.get_variable(code[1][0]).first_index
+                    index = code[1][1]
+                    for e in [base_address, base_index, index]:
+                        if e not in last_defs:
+                            last_defs[e] = DAGNode(e)
+                        node.children.append(last_defs[e])
+                    result_node = DAGNode(code[2])
+                    for el in code[3:]:
+                        if isinstance(el, tuple):
+                            subnode = DAGNode("=[]")
+                            base_address = self.symbols.get_address(el[0])
+                            base_index = self.symbols.get_variable(el[0]).first_index
+                            index = el[1]
+                            for e in [base_address, base_index, index]:
+                                if e not in last_defs:
+                                    last_defs[e] = DAGNode(e)
+                                subnode.children.append(last_defs[e])
+                            for n in last_defs.values():
+                                if n == subnode:
+                                    subnode = n
+                                    break
+                            result_node.children.append(subnode)
+                        else:
+                            if el not in last_defs:
+                                last_defs[el] = DAGNode(el)
+                            result_node.children.append(last_defs[el])
+
+                    for n in last_defs.values():
+                        if n == result_node:
+                            result_node = n
+                            break
+
+                    node.children.append(result_node)
+                    for n in last_defs.values():
+                        if n.op == "=[]" and n.children[0] == last_defs[base_address]:
+                            n.killed = True
+                else:
+                    node = DAGNode(code[2])
+                    for el in code[3:]:
+                        if isinstance(el, tuple):
+                            subnode = DAGNode("=[]")
+                            base_address = self.symbols.get_address(el[0])
+                            base_index = self.symbols.get_variable(el[0]).first_index
+                            index = el[1]
+                            for e in [base_address, base_index, index]:
+                                if e not in last_defs:
+                                    last_defs[e] = DAGNode(e)
+                                subnode.children.append(last_defs[e])
+                            for n in last_defs.values():
+                                if n == subnode:
+                                    subnode = n
+                                    break
+                            node.children.append(subnode)
+                        else:
+                            if el not in last_defs:
+                                last_defs[el] = DAGNode(el)
+                            node.children.append(last_defs[el])
+
+                    for n in last_defs.values():
+                        if n == node:
+                            node = n
+                            break
+                    if code[1] in last_defs:
+                        last_defs[code[1]].attached_vars.remove(code[1])
+                    last_defs[code[1]] = node
+                    node.attached_vars.add(code[1])
+
+            elif code[0].startswith("j_"):
+                node = DAGNode(code[0])
+                nodes.append(node)
+
+                for el in code[1:2]:
+                    if el == 0:
+                        continue
+                    else:
+                        if isinstance(el, tuple):
+                            subnode = DAGNode("=[]")
+                            base_address = self.symbols.get_address(el[0])
+                            base_index = self.symbols.get_variable(el[0]).first_index
+                            index = el[1]
+                            for e in [base_address, base_index, index]:
+                                if e not in last_defs:
+                                    last_defs[e] = DAGNode(e)
+                                subnode.children.append(last_defs[e])
+                            for n in last_defs.values():
+                                if n == subnode:
+                                    subnode = n
+                                    break
+                            node.children.append(subnode)
+                        else:
+                            if el not in last_defs:
+                                last_defs[el] = DAGNode(el)
+                            node.children.append(last_defs[el])
+            elif code[0] in ["read", "write"]:
+                node = DAGNode(code[0])
+                nodes.append(node)
+                el = code[1]
+
+                if isinstance(el, tuple):
+                    subnode = DAGNode("=[]")
+                    base_address = self.symbols.get_address(el[0])
+                    base_index = self.symbols.get_variable(el[0]).first_index
+                    for e in [base_address, base_index, el[1]]:
+                        if e not in last_defs:
+                            last_defs[e] = DAGNode(e)
+                        node.children.append(last_defs[e])
+                        subnode.children.append(last_defs[e])
+                    for n in last_defs:
+                        if n == subnode:
+                            node.children.append(n)
+                            break
+
+                elif isinstance(el, int):
+                    address = self.symbols.get_const(el)
+                    if address not in last_defs:
+                        last_defs[address] = DAGNode(address)
+                    node.children.append(last_defs[address])
+                else:
+                    address = self.symbols.get_address(el)
+                    for e in [address, el]:
+                        if e not in last_defs:
+                            last_defs[e] = DAGNode(e)
+                        node.children.append(last_defs[e])
+
+        nodes.extend(n for n in last_defs.values())
+        return set(nodes)
+
+
+    def gen_nextuse(self):
+        vars = {}
+        count = -1
+        for block in self.blocks:
+            for code in block.commands:
+                count += 1
+                if code[0] == "copy":
+                    if isinstance(code[1], tuple) and isinstance(code[1][1], str):
+                        if code[1][1] not in vars:
+                            vars[code[1][1]] = [count]
+                        else:
+                            vars[code[1][1]].append(count)
+                    if isinstance(code[2], tuple) and isinstance(code[2][1], str):
+                        if code[2][1] not in vars:
+                            vars[code[2][1]] = [count]
+                        else:
+                            vars[code[2][1]].append(count)
+                    elif isinstance(code[2], str):
+                        if code[2] not in vars:
+                            vars[code[2]] = [count]
+                        else:
+                            vars[code[2]].append(count)
+
+                elif code[0] == "assign":
+                    if isinstance(code[1], tuple) and isinstance(code[1][1], str):
+                        if code[1][2] not in vars:
+                            vars[code[1][2]] = [count]
+                        else:
+                            vars[code[1][2]].append(count)
+                    for el in code[2][1:]:
+                        if isinstance(el, tuple) and isinstance(el[1], str):
+                            if el[1] not in vars:
+                                vars[el[1]] = [count]
+                            else:
+                                vars[el[1]].append(count)
+                        elif isinstance(el, str):
+                            if el not in vars:
+                                vars[el] = [count]
+                            else:
+                                vars[el].append(count)
+
+                elif code[0].startswith("j_"):
+                    for el in code[1:2]:
+                        if isinstance(el, tuple) and isinstance(el[1], str):
+                            if el[1] not in vars:
+                                vars[el[1]] = [count]
+                            else:
+                                vars[el[1]].append(count)
+                        elif isinstance(el, str):
+                            if el not in vars:
+                                vars[el] = [count]
+                            else:
+                                vars[el].append(count)
+
+                elif code[0] in ["read", "write"]:
+                    el = code[1]
+                    if isinstance(el, tuple) and isinstance(el[1], str):
+                        if el[1] not in vars:
+                            vars[el[1]] = [count]
+                        else:
+                            vars[el[1]].append(count)
+                    elif isinstance(el, str):
+                        if el not in vars:
+                            vars[el] = [count]
+                        else:
+                            vars[el].append(count)
+        return vars
 
     def get_block_by_line(self, line_no):
         candidate = 0
