@@ -9,7 +9,10 @@ class ImpLexer(Lexer):
               DOWNTO, ENDFOR, READ, WRITE, EQ, NEQ, GT, LT, GEQ, LEQ, GETS}
     literals = {'+', '-', '*', '/', '%', ',', ':', ';', '(', ')'}
     ignore = ' \t'
-    ignore_comment = r'\[[^\]]*\]'
+
+    @_(r'\[[^\]]*\]')
+    def ignore_comment(self, t):
+        self.lineno += t.value.count('\n')
 
     @_(r'\n+')
     def ignore_newline(self, t):
@@ -222,7 +225,8 @@ class ImpParser(Parser):
     def error(self, token):
         raise Exception(f"Syntax error: '{token.value}' in line {token.lineno}")
 
-sys.tracebacklimit=0
+
+sys.tracebacklimit = 0
 lex = ImpLexer()
 pars = ImpParser()
 with open(sys.argv[1]) as in_f:
@@ -234,4 +238,3 @@ code_gen.gen_code()
 with open(sys.argv[2], 'w') as out_f:
     for line in code_gen.code:
         print(line, file=out_f)
-

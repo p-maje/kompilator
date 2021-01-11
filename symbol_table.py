@@ -18,7 +18,6 @@ class Array:
 class Variable:
     def __init__(self, memory_offset):
         self.memory_offset = memory_offset
-        self.register = None
         self.initialized = False
 
     def __repr__(self):

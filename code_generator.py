@@ -545,9 +545,6 @@ class CodeGenerator:
                 self.calculate_expression(condition[2], first_reg, second_reg)
                 self.code.append(f"JZERO {first_reg} finish")
 
-            else:
-                raise Exception("Weird stuff with cond")
-
         elif condition[2][0] == "const" and condition[2][1] == 0:
             if condition[0] == "le" or condition[0] == "eq":
                 self.calculate_expression(condition[1], first_reg, second_reg)
@@ -557,9 +554,6 @@ class CodeGenerator:
             elif condition[0] == "gt" or condition[0] == "ne":
                 self.calculate_expression(condition[1], first_reg, second_reg)
                 self.code.append(f"JZERO {first_reg} finish")
-
-            else:
-                raise Exception("Weird stuff with cond")
 
         else:
             self.calculate_expression(condition[1], first_reg, third_reg)
