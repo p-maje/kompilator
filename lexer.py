@@ -63,6 +63,7 @@ class ImpParser(Parser):
     tokens = ImpLexer.tokens
     symbols = SymbolTable()
     code = None
+    consts = set()
 
     @_('DECLARE declarations BEGIN commands END', 'BEGIN commands END')
     def program(self, p):
@@ -95,15 +96,21 @@ class ImpParser(Parser):
 
     @_('IF condition THEN commands ELSE commands ENDIF')
     def command(self, p):
-        return "ifelse", p[1], p[3], p[5]
+        resp = "ifelse", p[1], p[3], p[5], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('IF condition THEN commands ENDIF')
     def command(self, p):
-        return "if", p[1], p[3]
+        resp = "if", p[1], p[3], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('WHILE condition DO commands ENDWHILE')
     def command(self, p):
-        return "while", p[1], p[3]
+        resp = "while", p[1], p[3], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('REPEAT commands UNTIL condition ";"')
     def command(self, p):
@@ -111,11 +118,16 @@ class ImpParser(Parser):
 
     @_('FOR PID FROM value TO value DO commands ENDFOR')
     def command(self, p):
-        return "forup", p[1], p[3], p[5], p[7]
+        resp = "forup", p[1], p[3], p[5], p[7], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('FOR PID FROM value DOWNTO value DO commands ENDFOR')
     def command(self, p):
-        return "fordown", p[1], p[3], p[5], p[7]
+        # return "fordown", p[1], p[3], p[5], p[7]
+        resp = "fordown", p[1], p[3], p[5], p[7], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('READ identifier ";"')
     def command(self, p):
@@ -123,6 +135,8 @@ class ImpParser(Parser):
 
     @_('WRITE value ";"')
     def command(self, p):
+        if p[1][0] == "const":
+            self.consts.add(int(p[1][1]))
         return "write", p[1]
 
     @_('value')

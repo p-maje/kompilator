@@ -83,37 +83,62 @@ class CodeGenerator:
                 self.code.append(f"STORE {target_reg} {second_reg}")
 
             elif command[0] == "if":
-                condition_start = len(self.code)
-                self.check_condition(command[1])
-                command_start = len(self.code)
-                self.gen_code_from_commands(command[2])
-                command_end = len(self.code)
-                for i in range(condition_start, command_start):
-                    self.code[i] = self.code[i].replace('finish', str(command_end - i))
+                condition = self.simplify_condition(command[1])
+                if isinstance(condition, bool):
+                    if condition:
+                        # self.prepare_consts_before_block(command[-1])
+                        self.gen_code_from_commands(command[2])
+                else:
+                    self.prepare_consts_before_block(command[-1])
+                    condition_start = len(self.code)
+                    self.check_condition(condition)
+                    command_start = len(self.code)
+                    self.gen_code_from_commands(command[2])
+                    command_end = len(self.code)
+                    for i in range(condition_start, command_start):
+                        self.code[i] = self.code[i].replace('finish', str(command_end - i))
 
             elif command[0] == "ifelse":
-                condition_start = len(self.code)
-                self.check_condition(command[1])
-                if_start = len(self.code)
-                self.gen_code_from_commands(command[2])
-                self.code.append(f"JUMP finish")
-                else_start = len(self.code)
-                self.gen_code_from_commands(command[3])
-                command_end = len(self.code)
-                self.code[else_start - 1] = self.code[else_start - 1].replace('finish',
-                                                                              str(command_end - else_start + 1))
-                for i in range(condition_start, if_start):
-                    self.code[i] = self.code[i].replace('finish', str(else_start - i))
+                condition = self.simplify_condition(command[1])
+                if isinstance(condition, bool):
+                    if condition:
+                        # self.prepare_consts_before_block(command[-1])
+                        self.gen_code_from_commands(command[2])
+                    else:
+                        self.gen_code_from_commands(command[3])
+                else:
+                    self.prepare_consts_before_block(command[-1])
+                    condition_start = len(self.code)
+                    self.check_condition(command[1])
+                    if_start = len(self.code)
+                    self.gen_code_from_commands(command[2])
+                    self.code.append(f"JUMP finish")
+                    else_start = len(self.code)
+                    self.gen_code_from_commands(command[3])
+                    command_end = len(self.code)
+                    self.code[else_start - 1] = self.code[else_start - 1].replace('finish',
+                                                                                  str(command_end - else_start + 1))
+                    for i in range(condition_start, if_start):
+                        self.code[i] = self.code[i].replace('finish', str(else_start - i))
 
             elif command[0] == "while":
-                condition_start = len(self.code)
-                self.check_condition(command[1])
-                loop_start = len(self.code)
-                self.gen_code_from_commands(command[2])
-                self.code.append(f"JUMP {condition_start - len(self.code)}")
-                loop_end = len(self.code)
-                for i in range(condition_start, loop_start):
-                    self.code[i] = self.code[i].replace('finish', str(loop_end - i))
+                condition = self.simplify_condition(command[1])
+                if isinstance(condition, bool):
+                    if condition:
+                        self.prepare_consts_before_block(command[-1])
+                        loop_start = len(self.code)
+                        self.gen_code_from_commands(command[2])
+                        self.code.append(f"JUMP {loop_start - len(self.code)}")
+                else:
+                    self.prepare_consts_before_block(command[-1])
+                    condition_start = len(self.code)
+                    self.check_condition(command[1])
+                    loop_start = len(self.code)
+                    self.gen_code_from_commands(command[2])
+                    self.code.append(f"JUMP {condition_start - len(self.code)}")
+                    loop_end = len(self.code)
+                    for i in range(condition_start, loop_start):
+                        self.code[i] = self.code[i].replace('finish', str(loop_end - i))
 
             elif command[0] == "until":
                 loop_start = len(self.code)
@@ -125,10 +150,15 @@ class CodeGenerator:
                     self.code[i] = self.code[i].replace('finish', str(loop_start - i))
 
             elif command[0] == "forup":
+                if command[2][0] == command[3][0] == "const":
+                    if command[2][1] > command[3][1]:
+                        continue
                 if self.iterators:
                     address, bound_address = self.symbols.get_iterator(self.iterators[-1])
                     self.gen_const(address, 'e')
                     self.code.append(f"STORE f e")
+                else:
+                    self.prepare_consts_before_block(command[-1])
 
                 iterator = command[1]
                 address, bound_address = self.symbols.add_iterator(iterator)
@@ -165,10 +195,15 @@ class CodeGenerator:
                     self.code.append(f"LOAD f f")
 
             elif command[0] == "fordown":
+                if command[2][0] == command[3][0] == "const":
+                    if command[2][1] < command[3][1]:
+                        continue
                 if self.iterators:
                     address, bound_address = self.symbols.get_iterator(self.iterators[-1])
                     self.gen_const(address, 'e')
                     self.code.append(f"STORE f e")
+                else:
+                    self.prepare_consts_before_block(command[-1])
 
                 iterator = command[1]
                 address, bound_address = self.symbols.add_iterator(iterator)
@@ -187,7 +222,7 @@ class CodeGenerator:
                 self.code.append("JZERO e loop_start")
                 self.code.append("RESET d")
                 self.code.append("ADD d f")
-                self.code.append("INC d")  # TUTUAJ
+                self.code.append("INC d")
                 self.code.append("SUB d e")
                 self.code.append("JZERO d finish")
 
@@ -251,6 +286,10 @@ class CodeGenerator:
                 if expression[1][0] == expression[2][0] == "const":
                     self.gen_const(expression[1][1] + expression[2][1], target_reg)
 
+                elif expression[1] == expression[2]:
+                    self.calculate_expression(expression[1], target_reg, second_reg)
+                    self.code.append(f"SHL {target_reg}")
+
                 elif const and expression[const][1] < 12:
                     self.calculate_expression(expression[var], target_reg, second_reg)
                     change = f"INC {target_reg}"
@@ -268,6 +307,9 @@ class CodeGenerator:
                         self.gen_const(val, target_reg)
                     else:
                         self.code.append(f"RESET {target_reg}")
+
+                elif expression[1] == expression[2]:
+                    self.code.append(f"RESET {target_reg}")
 
                 elif const and const == 2 and expression[const][1] < 12:
                     self.calculate_expression(expression[var], target_reg, second_reg)
@@ -339,6 +381,11 @@ class CodeGenerator:
                         self.code.append(f"RESET {target_reg}")
                     return
 
+                elif expression[1] == expression[2]:
+                    self.code.append(f"RESET {target_reg}")
+                    self.code.append(f"INC {target_reg}")
+                    return
+
                 elif const and const == 1 and expression[const][1] == 0:
                     self.code.append(f"RESET {target_reg}")
                     return
@@ -370,18 +417,10 @@ class CodeGenerator:
                         self.code.append(f"RESET {target_reg}")
                     return
 
-                elif expression[1][0] == "const" and expression[1][1] == 0:
+                elif expression[1] == expression[2]:
                     self.code.append(f"RESET {target_reg}")
+                    return
 
-                elif expression[2][0] == "const" and expression[2][1] < 3:
-                    if expression[2][1] < 2:
-                        self.code.append(f"RESET {target_reg}")
-                    else:
-                        self.calculate_expression(expression[1], second_reg, target_reg)
-                        self.code.append(f"RESET {target_reg}")
-                        self.code.append(f"JODD {second_reg} 2")
-                        self.code.append(f"JUMP 2")
-                        self.code.append(f"INC {target_reg}")
                 elif const and const == 1 and expression[const][1] == 0:
                     self.code.append(f"RESET {target_reg}")
                     return
@@ -455,40 +494,49 @@ class CodeGenerator:
             self.code[i] = self.code[i].replace('block_start', str(block_start - i))
             self.code[i] = self.code[i].replace('finish', str(end - i))
 
-    def check_condition(self, condition, first_reg='a', second_reg='b', third_reg='c'):
+    def simplify_condition(self, condition):
         if condition[1][0] == "const" and condition[2][0] == "const":
             if condition[0] == "le":
-                if not condition[1][1] <= condition[2][1]:
-                    self.code.append(f"JUMP finish")
-
+                return condition[1][1] <= condition[2][1]
             elif condition[0] == "ge":
-                if not condition[1][1] >= condition[2][1]:
-                    self.code.append(f"JUMP finish")
-
+                return condition[1][1] >= condition[2][1]
             elif condition[0] == "lt":
-                if not condition[1][1] < condition[2][1]:
-                    self.code.append(f"JUMP finish")
-
+                return condition[1][1] < condition[2][1]
             elif condition[0] == "gt":
-                if not condition[1][1] > condition[2][1]:
-                    self.code.append(f"JUMP finish")
-
+                return condition[1][1] > condition[2][1]
             elif condition[0] == "eq":
-                if not condition[1][1] == condition[2][1]:
-                    self.code.append(f"JUMP finish")
-
+                return condition[1][1] == condition[2][1]
             elif condition[0] == "ne":
-                if not condition[1][1] != condition[2][1]:
-                    self.code.append(f"JUMP finish")
+                return condition[1][1] != condition[2][1]
 
         elif condition[1][0] == "const" and condition[1][1] == 0:
             if condition[0] == "le":
-                pass
-
+                return True
             elif condition[0] == "gt":
-                self.code.append(f"JUMP finish")
+                return False
+            else:
+                return condition
 
-            elif condition[0] == "ge" or condition[0] == "eq":
+        elif condition[2][0] == "const" and condition[2][1] == 0:
+            if condition[0] == "ge":
+                return True
+            elif condition[0] == "lt":
+                return False
+            else:
+                return condition
+
+        elif condition[1] == condition[2]:
+            if condition[0] in ["ge", "le", "eq"]:
+                return True
+            else:
+                return False
+
+        else:
+            return condition
+
+    def check_condition(self, condition, first_reg='a', second_reg='b', third_reg='c'):
+        if condition[1][0] == "const" and condition[1][1] == 0:
+            if condition[0] == "ge" or condition[0] == "eq":
                 self.calculate_expression(condition[2], first_reg, second_reg)
                 self.code.append(f"JZERO {first_reg} 2")
                 self.code.append("JUMP finish")
@@ -497,14 +545,11 @@ class CodeGenerator:
                 self.calculate_expression(condition[2], first_reg, second_reg)
                 self.code.append(f"JZERO {first_reg} finish")
 
+            else:
+                raise Exception("Weird stuff with cond")
+
         elif condition[2][0] == "const" and condition[2][1] == 0:
-            if condition[0] == "ge":
-                pass
-
-            elif condition[0] == "lt":
-                self.code.append(f"JUMP finish")
-
-            elif condition[0] == "le" or condition[0] == "eq":
+            if condition[0] == "le" or condition[0] == "eq":
                 self.calculate_expression(condition[1], first_reg, second_reg)
                 self.code.append(f"JZERO {first_reg} 2")
                 self.code.append("JUMP finish")
@@ -512,6 +557,9 @@ class CodeGenerator:
             elif condition[0] == "gt" or condition[0] == "ne":
                 self.calculate_expression(condition[1], first_reg, second_reg)
                 self.code.append(f"JZERO {first_reg} finish")
+
+            else:
+                raise Exception("Weird stuff with cond")
 
         else:
             self.calculate_expression(condition[1], first_reg, third_reg)
@@ -591,3 +639,12 @@ class CodeGenerator:
                 self.code.append(f"STORE f {reg}")
         else:
             raise Exception(f"Undeclared variable {name}")
+
+    def prepare_consts_before_block(self, consts, reg1='a', reg2='b'):
+        for c in consts:
+            address = self.symbols.get_const(c)
+            if address is None:
+                address = self.symbols.add_const(c)
+                self.gen_const(address, reg1)
+                self.gen_const(c, reg2)
+                self.code.append(f"STORE {reg2} {reg1}")
