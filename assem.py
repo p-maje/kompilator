@@ -7,6 +7,7 @@ class AssemblyGenerator:
         self.iterators = []
         self.block_beginnings = []
         self.iterator_end = False
+
     def gen_code(self):
         for b in self.blocks:
             start = len(self.code)

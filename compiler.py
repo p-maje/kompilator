@@ -213,7 +213,7 @@ class ImpParser(Parser):
     def error(self, token):
         raise Exception(f"Syntax error: '{token.value}' in line {token.lineno}")
 
-sys.tracebacklimit=0
+# sys.tracebacklimit=0
 lex = ImpLexer()
 pars = ImpParser()
 with open(sys.argv[1]) as in_f:
@@ -226,8 +226,9 @@ inter.generate_intermediate_code()
 #     print(c)
 # print()
 inter.divide_into_blocks()
-inter.simplify_block(inter.blocks[0])
-n = inter.gen_nextuse()
+inter.detect_loops()
+inter.detect_ifelse()
+inter.gen_live()
 # for i, b in enumerate(inter.blocks):
 #     for c in b.commands:
 #         print(i, c)

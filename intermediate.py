@@ -7,28 +7,6 @@ class CodeBlock:
         self.commands = commands
         self.code = []
 
-
-class DAGNode:
-    def __init__(self, operator):
-        self.op = operator
-        self.children = []
-        self.attached_vars = set()
-        self.killed = False
-        self.converted = False
-
-    def __eq__(self, other):
-        return self.op == other.op and self.children == other.children and not self.killed and not other.killed
-
-    def __hash__(self):
-        return hash(repr(self))
-
-    def __repr__(self):
-        base = f"({self.op}"
-        for c in self.children:
-            base += f" {c}"
-        base += ")"
-        return base
-
 class IntermediateCodeGenerator:
     def __init__(self, commands, symbols):
         self.commands = commands
@@ -36,6 +14,9 @@ class IntermediateCodeGenerator:
         self.code = []
         self.blocks = []
         self.active_iters = set()
+        self.live_variables = set()
+        self.loops = {}
+        self.ifelses ={}
 
     def generate_intermediate_code(self):
         self.code = self.generate_code(self.commands)
@@ -47,6 +28,12 @@ class IntermediateCodeGenerator:
         for command in commands:
             if command[0] == "write":
                 value = self.unpack_value(command[1])
+                if isinstance(value, tuple):
+                    self.live_variables.add(value[0])
+                    if isinstance(value[1], str):
+                        self.live_variables.add(value[1])
+                elif isinstance(value, str):
+                    self.live_variables.add(value)
                 code.append(("write", value))
 
             elif command[0] == "read":
@@ -130,7 +117,7 @@ class IntermediateCodeGenerator:
                 iterator = command[1]
 
                 code.append(("copy", iterator, self.unpack_value(command[2])))
-                code.append(("copy", iterator+"*", self.unpack_value(command[3])))
+                code.append(("copy", iterator + "*", self.unpack_value(command[3])))
                 self.active_iters.add(iterator)
                 self.symbols.add_iterator(iterator)
 
@@ -138,14 +125,14 @@ class IntermediateCodeGenerator:
                 code.extend(self.generate_code(command[4]))
                 code.append(("inc", iterator))
                 code.append(("j", start - len(code) - 1))
-                code[start:] = [("j_gt", iterator, iterator+"*", len(code) - start + 1)] + code[start:]
+                code[start:] = [("j_gt", iterator, iterator + "*", len(code) - start + 1)] + code[start:]
                 self.active_iters.remove(iterator)
 
             elif command[0] == "fordown":
                 iterator = command[1]
 
                 code.append(("copy", iterator, self.unpack_value(command[2])))
-                code.append(("copy", iterator+"*", self.unpack_value(command[3])))
+                code.append(("copy", iterator + "*", self.unpack_value(command[3])))
                 self.active_iters.add(iterator)
                 self.symbols.add_iterator(iterator)
 
@@ -154,7 +141,7 @@ class IntermediateCodeGenerator:
                 code.append(("j_eq", iterator, 0, 3))
                 code.append(("dec", iterator))
                 code.append(("j", start - len(code) - 1))
-                code[start:] = [("j_lt", iterator, iterator+"*", len(code) - start + 1)] + code[start:]
+                code[start:] = [("j_lt", iterator, iterator + "*", len(code) - start + 1)] + code[start:]
                 self.active_iters.remove(iterator)
         return code
 
@@ -314,271 +301,6 @@ class IntermediateCodeGenerator:
         last_block = block_starts[-1]
         self.blocks.append(CodeBlock(last_block, self.code[last_block:]))
 
-    def simplify_block(self, block):
-        last_defs = {}
-        nodes = []
-        for code in block.commands:
-            if code[0] == "copy":
-                if isinstance(code[1], tuple):
-                    node = DAGNode("[]=")
-                    nodes.append(node)
-                    base_address = self.symbols.get_address(code[1][0])
-                    base_index = self.symbols.get_variable(code[1][0]).first_index
-                    index = code[1][1]
-                    if isinstance(index, int):
-                        address = base_address + index - base_index
-                        if address not in last_defs:
-                            last_defs[address] = DAGNode(address)
-                        node.children.append(last_defs[address])
-                    else:
-                        for e in [base_address, base_index, index]:
-                            if e not in last_defs:
-                                last_defs[e] = DAGNode(e)
-                        subnode = DAGNode("sub")
-                        subnode.children
-                        node.children.append(last_defs[e])
-                    if isinstance(code[2], tuple):
-                        subnode = DAGNode("=[]")
-                        base_address = self.symbols.get_address(code[2][0])
-                        base_index = self.symbols.get_variable(code[2][0]).first_index
-                        index = code[2][1]
-                        for e in [base_address, base_index, index]:
-                            if e not in last_defs:
-                                last_defs[e] = DAGNode(e)
-                            subnode.children.append(last_defs[e])
-                        for n in last_defs.values():
-                            if n == subnode:
-                                subnode = n
-                                break
-                        node.children.append(subnode)
-                    else:
-                        if code[2] not in last_defs:
-                            last_defs[code[2]] = DAGNode(code[2])
-                        node.children.append(last_defs[code[2]])
-                    for n in last_defs.values():
-                        if n.op == "=[]" and n.children[0] == last_defs[base_address]:
-                            n.killed = True
-                else:
-                    if isinstance(code[2], tuple):
-                        node = DAGNode("=[]")
-                        base_address = self.symbols.get_address(code[2][0])
-                        base_index = self.symbols.get_variable(code[2][0]).first_index
-                        for e in [base_address, base_index, code[2][1]]:
-                            if e not in last_defs:
-                                last_defs[e] = DAGNode(e)
-                            node.children.append(last_defs[e])
-                        if code[1] in last_defs:
-                            last_defs[code[1]].attached_vars.remove(code[1])
-                        last_defs[code[1]] = node
-                        last_defs[code[1]].attached_vars.add(code[1])
-                    else:
-                        if code[2] not in last_defs:
-                            last_defs[code[2]] = DAGNode(code[2])
-                        if code[1] in last_defs:
-                            last_defs[code[1]].attached_vars.remove(code[1])
-                        last_defs[code[1]] = last_defs[code[2]]
-                        last_defs[code[1]].attached_vars.add(code[1])
-
-            elif code[0] == "assign":
-                if isinstance(code[1], tuple):
-                    node = DAGNode("[]=")
-                    base_address = self.symbols.get_address(code[1][0])
-                    base_index = self.symbols.get_variable(code[1][0]).first_index
-                    index = code[1][1]
-                    for e in [base_address, base_index, index]:
-                        if e not in last_defs:
-                            last_defs[e] = DAGNode(e)
-                        node.children.append(last_defs[e])
-                    result_node = DAGNode(code[2])
-                    for el in code[3:]:
-                        if isinstance(el, tuple):
-                            subnode = DAGNode("=[]")
-                            base_address = self.symbols.get_address(el[0])
-                            base_index = self.symbols.get_variable(el[0]).first_index
-                            index = el[1]
-                            for e in [base_address, base_index, index]:
-                                if e not in last_defs:
-                                    last_defs[e] = DAGNode(e)
-                                subnode.children.append(last_defs[e])
-                            for n in last_defs.values():
-                                if n == subnode:
-                                    subnode = n
-                                    break
-                            result_node.children.append(subnode)
-                        else:
-                            if el not in last_defs:
-                                last_defs[el] = DAGNode(el)
-                            result_node.children.append(last_defs[el])
-
-                    for n in last_defs.values():
-                        if n == result_node:
-                            result_node = n
-                            break
-
-                    node.children.append(result_node)
-                    for n in last_defs.values():
-                        if n.op == "=[]" and n.children[0] == last_defs[base_address]:
-                            n.killed = True
-                else:
-                    node = DAGNode(code[2])
-                    for el in code[3:]:
-                        if isinstance(el, tuple):
-                            subnode = DAGNode("=[]")
-                            base_address = self.symbols.get_address(el[0])
-                            base_index = self.symbols.get_variable(el[0]).first_index
-                            index = el[1]
-                            for e in [base_address, base_index, index]:
-                                if e not in last_defs:
-                                    last_defs[e] = DAGNode(e)
-                                subnode.children.append(last_defs[e])
-                            for n in last_defs.values():
-                                if n == subnode:
-                                    subnode = n
-                                    break
-                            node.children.append(subnode)
-                        else:
-                            if el not in last_defs:
-                                last_defs[el] = DAGNode(el)
-                            node.children.append(last_defs[el])
-
-                    for n in last_defs.values():
-                        if n == node:
-                            node = n
-                            break
-                    if code[1] in last_defs:
-                        last_defs[code[1]].attached_vars.remove(code[1])
-                    last_defs[code[1]] = node
-                    node.attached_vars.add(code[1])
-
-            elif code[0].startswith("j_"):
-                node = DAGNode(code[0])
-                nodes.append(node)
-
-                for el in code[1:2]:
-                    if el == 0:
-                        continue
-                    else:
-                        if isinstance(el, tuple):
-                            subnode = DAGNode("=[]")
-                            base_address = self.symbols.get_address(el[0])
-                            base_index = self.symbols.get_variable(el[0]).first_index
-                            index = el[1]
-                            for e in [base_address, base_index, index]:
-                                if e not in last_defs:
-                                    last_defs[e] = DAGNode(e)
-                                subnode.children.append(last_defs[e])
-                            for n in last_defs.values():
-                                if n == subnode:
-                                    subnode = n
-                                    break
-                            node.children.append(subnode)
-                        else:
-                            if el not in last_defs:
-                                last_defs[el] = DAGNode(el)
-                            node.children.append(last_defs[el])
-            elif code[0] in ["read", "write"]:
-                node = DAGNode(code[0])
-                nodes.append(node)
-                el = code[1]
-
-                if isinstance(el, tuple):
-                    subnode = DAGNode("=[]")
-                    base_address = self.symbols.get_address(el[0])
-                    base_index = self.symbols.get_variable(el[0]).first_index
-                    for e in [base_address, base_index, el[1]]:
-                        if e not in last_defs:
-                            last_defs[e] = DAGNode(e)
-                        node.children.append(last_defs[e])
-                        subnode.children.append(last_defs[e])
-                    for n in last_defs:
-                        if n == subnode:
-                            node.children.append(n)
-                            break
-
-                elif isinstance(el, int):
-                    address = self.symbols.get_const(el)
-                    if address not in last_defs:
-                        last_defs[address] = DAGNode(address)
-                    node.children.append(last_defs[address])
-                else:
-                    address = self.symbols.get_address(el)
-                    for e in [address, el]:
-                        if e not in last_defs:
-                            last_defs[e] = DAGNode(e)
-                        node.children.append(last_defs[e])
-
-        nodes.extend(n for n in last_defs.values())
-        return set(nodes)
-
-
-    def gen_nextuse(self):
-        vars = {}
-        count = -1
-        for block in self.blocks:
-            for code in block.commands:
-                count += 1
-                if code[0] == "copy":
-                    if isinstance(code[1], tuple) and isinstance(code[1][1], str):
-                        if code[1][1] not in vars:
-                            vars[code[1][1]] = [count]
-                        else:
-                            vars[code[1][1]].append(count)
-                    if isinstance(code[2], tuple) and isinstance(code[2][1], str):
-                        if code[2][1] not in vars:
-                            vars[code[2][1]] = [count]
-                        else:
-                            vars[code[2][1]].append(count)
-                    elif isinstance(code[2], str):
-                        if code[2] not in vars:
-                            vars[code[2]] = [count]
-                        else:
-                            vars[code[2]].append(count)
-
-                elif code[0] == "assign":
-                    if isinstance(code[1], tuple) and isinstance(code[1][1], str):
-                        if code[1][2] not in vars:
-                            vars[code[1][2]] = [count]
-                        else:
-                            vars[code[1][2]].append(count)
-                    for el in code[2][1:]:
-                        if isinstance(el, tuple) and isinstance(el[1], str):
-                            if el[1] not in vars:
-                                vars[el[1]] = [count]
-                            else:
-                                vars[el[1]].append(count)
-                        elif isinstance(el, str):
-                            if el not in vars:
-                                vars[el] = [count]
-                            else:
-                                vars[el].append(count)
-
-                elif code[0].startswith("j_"):
-                    for el in code[1:2]:
-                        if isinstance(el, tuple) and isinstance(el[1], str):
-                            if el[1] not in vars:
-                                vars[el[1]] = [count]
-                            else:
-                                vars[el[1]].append(count)
-                        elif isinstance(el, str):
-                            if el not in vars:
-                                vars[el] = [count]
-                            else:
-                                vars[el].append(count)
-
-                elif code[0] in ["read", "write"]:
-                    el = code[1]
-                    if isinstance(el, tuple) and isinstance(el[1], str):
-                        if el[1] not in vars:
-                            vars[el[1]] = [count]
-                        else:
-                            vars[el[1]].append(count)
-                    elif isinstance(el, str):
-                        if el not in vars:
-                            vars[el] = [count]
-                        else:
-                            vars[el].append(count)
-        return vars
-
     def get_block_by_line(self, line_no):
         candidate = 0
         for i, b in enumerate(self.blocks):
@@ -587,3 +309,180 @@ class IntermediateCodeGenerator:
             else:
                 break
         return candidate
+
+    def detect_loops(self):
+        for i, b in enumerate(self.blocks):
+            last = b.commands[-1]
+            if 'j' in last[0]:
+                if last[-1] < i:
+                    self.loops[i] = last[-1]
+
+    def detect_ifelse(self):
+        for i, b in enumerate(self.blocks):
+            last = b.commands[-1]
+            if 'j_' in last[0]:
+                if last[-1] > i:
+                    self.ifelses[last[-1]] = i
+
+        for i, v in list(self.ifelses.items()):
+            if v in self.loops.values():
+                self.ifelses.pop(i)
+
+        for i, v in self.ifelses.items():
+            for j in range(i-1, v, -1):
+                if self.blocks[j].commands[-1] == ("j", i+1):
+                    self.ifelses[i] = (j, v)
+                    break
+
+        for i in list(self.ifelses):
+            if isinstance(self.ifelses[i], int):
+                self.ifelses.pop(i)
+
+    def gen_live(self):
+        b_id = len(self.blocks) - 1
+        ifend = None
+        condend = None
+        loopend = None
+        varcopy_ifelse = set()
+        varcopy_loop = set()
+        for b in reversed(self.blocks):
+            if b_id in [ifend, condend]:
+                for v in varcopy_ifelse:
+                    self.live_variables.add(v)
+            elif b_id in self.ifelses:
+                ifend, condend = self.ifelses[b_id]
+                varcopy_ifelse = self.live_variables.copy()
+            elif b_id in self.loops:
+                varcopy_loop = self.live_variables.copy()
+                self.gen_live_loop(b_id)
+                for v in varcopy_loop:
+                    self.live_variables.add(v)
+            b_id -= 1
+            rewritten = []
+            for c in reversed(b.commands):
+                if c[0] == 'assign':
+                    if isinstance(c[1], tuple) and c[1][0] in self.live_variables:
+                        if isinstance(c[1][1], str):
+                            self.live_variables.add(c[1][1])
+                    elif c[1] in self.live_variables:
+                        self.live_variables.remove(c[1])
+                    else:
+                        continue
+                    for e in c[3:]:
+                        if isinstance(e, tuple):
+                            self.live_variables.add(e[0])
+                            if isinstance(e[1], str):
+                                self.live_variables.add(e[1])
+                        elif isinstance(e, str):
+                            self.live_variables.add(e)
+                    rewritten.append(c)
+                elif c[0] == 'copy':
+                    if c[1] in self.symbols.iterators:
+                        pass
+                    elif isinstance(c[1], tuple) and c[1][0] in self.live_variables:
+                        if isinstance(c[1][1], str):
+                            self.live_variables.add(c[1][1])
+                    elif c[1] in self.live_variables:
+                        self.live_variables.remove(c[1])
+                    else:
+                        continue
+
+                    if isinstance(c[2], tuple):
+                        self.live_variables.add(c[2][0])
+                        if isinstance(c[2][1], str):
+                            self.live_variables.add(c[2][1])
+                    elif isinstance(c[2], str):
+                        self.live_variables.add(c[2])
+                    rewritten.append(c)
+
+                elif 'j_' in c[0]:
+                    for e in c[1:]:
+                        if isinstance(e, tuple):
+                            self.live_variables.add(e[0])
+                            if isinstance(e[1], str):
+                                self.live_variables.add(e[1])
+                        elif isinstance(e, str):
+                            self.live_variables.add(e)
+                    rewritten.append(c)
+
+                elif c[0] == 'read':
+                    if isinstance(c[1], str) and c[1] in self.live_variables:
+                        self.live_variables.remove(c[1])
+                    rewritten.append(c)
+
+                elif c[0] == 'write':
+                    if isinstance(c[1], tuple):
+                        self.live_variables.add(c[1][0])
+                        if isinstance(c[1][1], str):
+                            self.live_variables.add(c[1][1])
+                    elif isinstance(c[1], str):
+                        self.live_variables.add(c[1])
+                    rewritten.append(c)
+                else:
+                    rewritten.append(c)
+
+            b.commands = list(reversed(rewritten))
+        new_offset = 0
+
+        for b in self.blocks:
+            b.start_index = new_offset
+            new_offset += len(b.commands)
+
+    def gen_live_loop(self, block_id):
+        for i in range(block_id, max(0, self.loops[block_id]-1), -1):
+            b = self.blocks[i]
+            for c in reversed(b.commands):
+                if c[0] == 'assign':
+                    if isinstance(c[1], tuple) and c[1][0] in self.live_variables:
+                        if isinstance(c[1][1], str):
+                            self.live_variables.add(c[1][1])
+                    elif c[1] in self.live_variables:
+                        self.live_variables.remove(c[1])
+                    else:
+                        continue
+                    for e in c[3:]:
+                        if isinstance(e, tuple):
+                            self.live_variables.add(e[0])
+                            if isinstance(c[1][1], str):
+                                self.live_variables.add(e[1])
+                        elif isinstance(e, str):
+                            self.live_variables.add(e)
+
+                elif c[0] == 'copy':
+                    if c[1] in self.symbols.iterators:
+                        pass
+                    elif isinstance(c[1], tuple) and c[1][0] in self.live_variables:
+                        if isinstance(c[1][1], str):
+                            self.live_variables.add(c[1][1])
+                    elif c[1] in self.live_variables:
+                        self.live_variables.remove(c[1])
+                    else:
+                        continue
+
+                    if isinstance(c[2], tuple):
+                        self.live_variables.add(c[2][0])
+                        if isinstance(c[2][1], str):
+                            self.live_variables.add(c[2][1])
+                    elif isinstance(c[2], str):
+                        self.live_variables.add(c[2])
+
+                elif 'j_' in c[0]:
+                    for e in c[1:]:
+                        if isinstance(e, tuple):
+                            self.live_variables.add(e[0])
+                            if isinstance(e[1], str):
+                                self.live_variables.add(e[1])
+                        elif isinstance(e, str):
+                            self.live_variables.add(e)
+
+                elif c[0] == 'read':
+                    if isinstance(c[1], str) and c[1] in self.live_variables:
+                        self.live_variables.remove(c[1])
+
+                elif c[0] == 'write':
+                    if isinstance(c[1], tuple):
+                        self.live_variables.add(c[1][0])
+                        if isinstance(c[1][1], str):
+                            self.live_variables.add(c[1][1])
+                    elif isinstance(c[1], str):
+                        self.live_variables.add(c[1])
