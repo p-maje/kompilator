@@ -509,3 +509,41 @@ class IntermediateCodeGenerator:
                             self.live_variables.add(c[1][1])
                     elif isinstance(c[1], str):
                         self.live_variables.add(c[1])
+
+    def remove_empty_loops(self):
+        checks = sorted([(start, fin) for fin, start in self.loops.items()], key=lambda x: x[1]-x[0])
+        change = False
+        j = 0
+        while j < len(checks):
+            start, fin = checks[j]
+            empty = True
+            for i in range(start, fin+1):
+                for c in self.blocks[i].commands:
+                    if c[0] == "j":
+                        pass
+                    elif c[0] in ["inc", "dec"]:
+                        current_iterator = c[1]
+                    elif not c[1] in self.symbols.iterators:
+                        empty = False
+                        break
+                if not empty:
+                    break
+            if empty:
+                change = True
+                last_block = self.blocks[start-1].commands
+                self.blocks[start-1].commands = [c for c in last_block if c[1] not in f"{current_iterator}*"]
+                for i in range(start, fin + 1):
+                    self.blocks[i].commands = []
+            else:
+                remaining = checks[j+1:]
+                for s, f in remaining:
+                    if s <= start and fin <= f:
+                        checks.remove((s, f))
+            j += 1
+
+        if change:
+            new_offset = 0
+            for b in self.blocks:
+                b.start_index = new_offset
+                new_offset += len(b.commands)
+

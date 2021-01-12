@@ -244,6 +244,8 @@ inter.divide_into_blocks()
 inter.detect_loops()
 inter.detect_ifelse()
 inter.gen_live()
+inter.remove_empty_loops()
+inter.gen_live()
 
 code_gen = AssemblyGenerator(inter.blocks, inter.symbols)
 code_gen.gen_code()
