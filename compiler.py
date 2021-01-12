@@ -66,6 +66,10 @@ class ImpParser(Parser):
     tokens = ImpLexer.tokens
     symbols = SymbolTable()
     code = None
+    # We need a set of consts that will be written inside a loop/if. These need to be generated and stored pre-entry
+    # because the entry might not happen at all, for instance for [if 1 > 2 then write 1; endif write 1;] the code
+    # for storing 1 in memory would get generated inside the if and never be executed, causing the second write to
+    # print something undefined.
     consts = set()
 
     @_('DECLARE declarations BEGIN commands END', 'BEGIN commands END')
@@ -127,7 +131,6 @@ class ImpParser(Parser):
 
     @_('FOR PID FROM value DOWNTO value DO commands ENDFOR')
     def command(self, p):
-        # return "fordown", p[1], p[3], p[5], p[7]
         resp = "fordown", p[1], p[3], p[5], p[7], self.consts.copy()
         self.consts.clear()
         return resp

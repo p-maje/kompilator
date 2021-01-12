@@ -86,7 +86,6 @@ class CodeGenerator:
                 condition = self.simplify_condition(command[1])
                 if isinstance(condition, bool):
                     if condition:
-                        # self.prepare_consts_before_block(command[-1])
                         self.gen_code_from_commands(command[2])
                 else:
                     self.prepare_consts_before_block(command[-1])
@@ -102,7 +101,6 @@ class CodeGenerator:
                 condition = self.simplify_condition(command[1])
                 if isinstance(condition, bool):
                     if condition:
-                        # self.prepare_consts_before_block(command[-1])
                         self.gen_code_from_commands(command[2])
                     else:
                         self.gen_code_from_commands(command[3])
