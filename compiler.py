@@ -2,7 +2,6 @@ from sly import Lexer, Parser
 
 from assem import AssemblyGenerator
 from symbol_table import SymbolTable, Array, Variable
-from code_generator import CodeGenerator
 from intermediate import IntermediateCodeGenerator
 import sys
 
@@ -12,7 +11,10 @@ class ImpLexer(Lexer):
               DOWNTO, ENDFOR, READ, WRITE, EQ, NEQ, GT, LT, GEQ, LEQ, GETS}
     literals = {'+', '-', '*', '/', '%', ',', ':', ';', '(', ')'}
     ignore = ' \t'
-    ignore_comment = r'\[[^\]]*\]'
+
+    @_(r'\[[^\]]*\]')
+    def ignore_comment(self, t):
+        self.lineno += t.value.count('\n')
 
     @_(r'\n+')
     def ignore_newline(self, t):
@@ -65,14 +67,17 @@ class ImpLexer(Lexer):
 class ImpParser(Parser):
     tokens = ImpLexer.tokens
     symbols = SymbolTable()
-    code = None
     inter = None
+    # We need a set of consts that will be written inside a loop/if. These need to be generated and stored pre-entry
+    # because the entry might not happen at all, for instance for [if 1 > 2 then write 1; endif write 1;] the code
+    # for storing 1 in memory would get generated inside the if and never be executed, causing the second write to
+    # print something undefined.
+    consts = set()
 
     @_('DECLARE declarations BEGIN commands END', 'BEGIN commands END')
     def program(self, p):
-        self.code = CodeGenerator(p.commands, self.symbols)
         self.inter = IntermediateCodeGenerator(p.commands, self.symbols)
-        return self.code
+        return self.inter
 
     @_('declarations "," PID', 'PID')
     def declarations(self, p):
@@ -100,15 +105,21 @@ class ImpParser(Parser):
 
     @_('IF condition THEN commands ELSE commands ENDIF')
     def command(self, p):
-        return "ifelse", p[1], p[3], p[5]
+        resp = "ifelse", p[1], p[3], p[5], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('IF condition THEN commands ENDIF')
     def command(self, p):
-        return "if", p[1], p[3]
+        resp = "if", p[1], p[3], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('WHILE condition DO commands ENDWHILE')
     def command(self, p):
-        return "while", p[1], p[3]
+        resp = "while", p[1], p[3], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('REPEAT commands UNTIL condition ";"')
     def command(self, p):
@@ -116,11 +127,15 @@ class ImpParser(Parser):
 
     @_('FOR PID FROM value TO value DO commands ENDFOR')
     def command(self, p):
-        return "forup", p[1], p[3], p[5], p[7]
+        resp = "forup", p[1], p[3], p[5], p[7], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('FOR PID FROM value DOWNTO value DO commands ENDFOR')
     def command(self, p):
-        return "fordown", p[1], p[3], p[5], p[7]
+        resp = "fordown", p[1], p[3], p[5], p[7], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('READ identifier ";"')
     def command(self, p):
@@ -128,6 +143,8 @@ class ImpParser(Parser):
 
     @_('WRITE value ";"')
     def command(self, p):
+        if p[1][0] == "const":
+            self.consts.add(int(p[1][1]))
         return "write", p[1]
 
     @_('value')
@@ -220,27 +237,19 @@ with open(sys.argv[1]) as in_f:
     text = in_f.read()
 
 pars.parse(lex.tokenize(text))
+
 inter = pars.inter
 inter.generate_intermediate_code()
-# for c in inter.code:
-#     print(c)
-# print()
 inter.divide_into_blocks()
 inter.detect_loops()
 inter.detect_ifelse()
 inter.gen_live()
-# for i, b in enumerate(inter.blocks):
-#     for c in b.commands:
-#         print(i, c)
+
 code_gen = AssemblyGenerator(inter.blocks, inter.symbols)
 code_gen.gen_code()
 with open(sys.argv[2], 'w') as out_f:
     for line in code_gen.code:
         print(line, file=out_f)
-# code_gen = pars.code
-# code_gen.gen_code()
-# with open(sys.argv[2], 'w') as out_f:
-#     for line in code_gen.code:
-#         print(line, file=out_f)
+
 
 

@@ -63,6 +63,15 @@ class AssemblyGenerator:
                     self.load_variable_address(target, register)
                 self.code.append(f"GET {register}")
 
+            elif command[0] == "store":
+                value = command[1]
+                register = 'a'
+                register1 = 'b'
+                address = self.symbols.add_const(value)
+                self.gen_const(address, register)
+                self.gen_const(value, register1)
+                self.code.append(f"STORE {register1} {register}")
+
             elif command[0] == "inc":
                 self.code.append(f"INC f")
                 self.iterator_end = True

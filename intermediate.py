@@ -7,6 +7,7 @@ class CodeBlock:
         self.commands = commands
         self.code = []
 
+
 class IntermediateCodeGenerator:
     def __init__(self, commands, symbols):
         self.commands = commands
@@ -28,12 +29,12 @@ class IntermediateCodeGenerator:
         for command in commands:
             if command[0] == "write":
                 value = self.unpack_value(command[1])
-                if isinstance(value, tuple):
-                    self.live_variables.add(value[0])
-                    if isinstance(value[1], str):
-                        self.live_variables.add(value[1])
-                elif isinstance(value, str):
-                    self.live_variables.add(value)
+                # if isinstance(value, tuple):
+                #     self.live_variables.add(value[0])
+                #     if isinstance(value[1], str):
+                #         self.live_variables.add(value[1])
+                # elif isinstance(value, str):
+                #     self.live_variables.add(value)
                 code.append(("write", value))
 
             elif command[0] == "read":
@@ -63,6 +64,7 @@ class IntermediateCodeGenerator:
                     else:
                         code.extend(self.generate_code(command[2]))
                 else:
+                    code.extend(("store", c) for c in command[-1])
                     start = len(code)
                     code.extend(self.generate_code(command[2]))
                     condition = (*condition, len(code) - start + 1)
@@ -76,6 +78,7 @@ class IntermediateCodeGenerator:
                     else:
                         code.extend(self.generate_code(command[2]))
                 else:
+                    code.extend(("store", c) for c in command[-1])
                     start = len(code)
                     code.extend(self.generate_code(command[2]))
                     condition = (*condition, len(code) - start + 2)
@@ -90,10 +93,12 @@ class IntermediateCodeGenerator:
                     if condition:
                         continue
                     else:
+                        code.extend(("store", c) for c in command[-1])
                         start = len(code)
                         code.extend(self.generate_code(command[2]))
                         code.append(("j", start - len(code)))
                 else:
+                    code.extend(("store", c) for c in command[-1])
                     start = len(code)
                     code.extend(self.generate_code(command[2]))
                     condition = (*condition, len(code) - start + 2)
@@ -101,6 +106,7 @@ class IntermediateCodeGenerator:
                     code.append(("j", start - len(code)))
 
             elif command[0] == "until":
+                code.extend(("store", c) for c in command[-1])
                 start = len(code)
                 code.extend(self.generate_code(command[2]))
                 condition = self.unpack_cond(command[1])
@@ -115,6 +121,7 @@ class IntermediateCodeGenerator:
 
             elif command[0] == "forup":
                 iterator = command[1]
+                code.extend(("store", c) for c in command[-1])
 
                 code.append(("copy", iterator, self.unpack_value(command[2])))
                 code.append(("copy", iterator + "*", self.unpack_value(command[3])))
@@ -130,6 +137,7 @@ class IntermediateCodeGenerator:
 
             elif command[0] == "fordown":
                 iterator = command[1]
+                code.extend(("store", c) for c in command[-1])
 
                 code.append(("copy", iterator, self.unpack_value(command[2])))
                 code.append(("copy", iterator + "*", self.unpack_value(command[3])))
@@ -342,9 +350,7 @@ class IntermediateCodeGenerator:
         b_id = len(self.blocks) - 1
         ifend = None
         condend = None
-        loopend = None
         varcopy_ifelse = set()
-        varcopy_loop = set()
         for b in reversed(self.blocks):
             if b_id in [ifend, condend]:
                 for v in varcopy_ifelse:
@@ -415,15 +421,32 @@ class IntermediateCodeGenerator:
                         self.live_variables.add(c[1][0])
                         if isinstance(c[1][1], str):
                             self.live_variables.add(c[1][1])
-                    elif isinstance(c[1], str):
+                    else:
                         self.live_variables.add(c[1])
                     rewritten.append(c)
+
+                elif c[0] == 'store':
+                    if c[1] in self.live_variables:
+                        self.live_variables.remove(c[1])
+                        rewritten.append(c)
                 else:
                     rewritten.append(c)
 
             b.commands = list(reversed(rewritten))
-        new_offset = 0
 
+        stored = set()
+        for b in self.blocks:
+            rewritten = []
+            for c in b.commands:
+                if c[0] == 'store':
+                    if c[1] not in stored:
+                        stored.add(c[1])
+                        rewritten.append(c)
+                else:
+                    rewritten.append(c)
+            b.commands = rewritten
+
+        new_offset = 0
         for b in self.blocks:
             b.start_index = new_offset
             new_offset += len(b.commands)
