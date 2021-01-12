@@ -150,7 +150,7 @@ class AssemblyGenerator:
                              fifth_reg='e'):
         if isinstance(expression[1], int):
             const, var = 1, 2
-        elif isinstance(expression[1], int):
+        elif isinstance(expression[2], int):
             const, var = 2, 1
         else:
             const = None
@@ -162,8 +162,11 @@ class AssemblyGenerator:
                 self.code += expression[const] * [change]
             else:
                 self.calculate_value(expression[1], target_reg, second_reg)
-                self.calculate_value(expression[2], second_reg, third_reg)
-                self.code.append(f"ADD {target_reg} {second_reg}")
+                if expression[1] == expression[2]:
+                    self.code.append(f"SHL {target_reg}")
+                else:
+                    self.calculate_value(expression[2], second_reg, third_reg)
+                    self.code.append(f"ADD {target_reg} {second_reg}")
 
         elif expression[0] == "sub":
             if const and const == 2 and expression[const] < 12:
@@ -186,7 +189,11 @@ class AssemblyGenerator:
                     return
 
             self.calculate_value(expression[1], second_reg, target_reg)
-            self.calculate_value(expression[2], third_reg, target_reg)
+            if expression[1] != expression[2]:
+                self.calculate_value(expression[2], third_reg, target_reg)
+            else:
+                self.code.append(f"RESET {third_reg}")
+                self.code.append(f"ADD {third_reg} {second_reg}")
 
             self.code.append(f"RESET {target_reg}")
             self.code.append(f"JZERO {second_reg} 21")
@@ -226,8 +233,13 @@ class AssemblyGenerator:
                     return
 
             self.calculate_value(expression[1], third_reg, second_reg)
-            self.calculate_value(expression[2], fourth_reg, second_reg)
-            self.perform_division(target_reg, second_reg, third_reg, fourth_reg, fifth_reg)
+            if expression[1] == expression[2]:
+                self.code.append(f"RESET {target_reg}")
+                self.code.append(f"JZERO {third_reg} 2")
+                self.code.append(f"INC {target_reg}")
+            else:
+                self.calculate_value(expression[2], fourth_reg, second_reg)
+                self.perform_division(target_reg, second_reg, third_reg, fourth_reg, fifth_reg)
 
         elif expression[0] == "mod":
             if const and const == 2:
@@ -238,10 +250,10 @@ class AssemblyGenerator:
                     self.code.append(f"JUMP 2")
                     self.code.append(f"INC {target_reg}")
                     return
-            else:
-                self.calculate_value(expression[1], third_reg, second_reg)
-                self.calculate_value(expression[2], fourth_reg, second_reg)
-                self.perform_division(second_reg, target_reg, third_reg, fourth_reg, fifth_reg)
+
+            self.calculate_value(expression[1], third_reg, second_reg)
+            self.calculate_value(expression[2], fourth_reg, second_reg)
+            self.perform_division(second_reg, target_reg, third_reg, fourth_reg, fifth_reg)
 
     def perform_division(self, quotient_register='a', remainder_register='b', dividend_register='c',
                          divisor_register='d', temp_register='e'):

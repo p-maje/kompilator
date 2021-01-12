@@ -48,11 +48,14 @@ class IntermediateCodeGenerator:
                     expr = (command[2][0], self.unpack_value(command[2][1]), self.unpack_value(command[2][2]))
                     expr, to_copy = self.unpack_expr(expr)
                     if to_copy:
-                        code.append(("copy", self.unpack_value(command[1], update=True), expr))
+                        if command[1] != expr:
+                            code.append(("copy", self.unpack_value(command[1], update=True), expr))
                     else:
                         code.append(("assign", self.unpack_value(command[1], update=True), *expr))
                 else:
-                    code.append(("copy", self.unpack_value(command[1], update=True), self.unpack_value(command[2])))
+                    val = self.unpack_value(command[2])
+                    if command[1] != val:
+                        code.append(("copy", self.unpack_value(command[1], update=True), self.unpack_value(command[2])))
                 if type(command[1]) != tuple:
                     self.symbols[command[1]].initialized = True
 
@@ -187,6 +190,8 @@ class IntermediateCodeGenerator:
                 return 0, True
             else:
                 return expr, False
+        elif expr[1] == expr[2] and expr[0] in ['sub', 'mod']:
+            return 0, True
         else:
             return expr, False
 
