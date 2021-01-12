@@ -325,8 +325,6 @@ class AssemblyGenerator:
                 elif condition == "ne":
                     self.code.append(f"JZERO {first_reg} 2")
                     self.code.append(f"JUMP B{block_to_jump}")
-                else:
-                    print("weird cond")
                 return
 
             elif jump[2] == 0:
@@ -339,8 +337,6 @@ class AssemblyGenerator:
                 elif condition == "ne":
                     self.code.append(f"JZERO {first_reg} 2")
                     self.code.append(f"JUMP B{block_to_jump}")
-                else:
-                    print("weird cond")
                 return
 
             self.calculate_value(jump[1], first_reg, third_reg)

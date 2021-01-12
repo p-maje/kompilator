@@ -1,4 +1,4 @@
-from symbol_table import Variable
+from symbol_table import Variable, Array
 
 
 class CodeBlock:
@@ -16,6 +16,7 @@ class IntermediateCodeGenerator:
         self.blocks = []
         self.active_iters = set()
         self.live_variables = set()
+        self.last_use = {}
         self.loops = {}
         self.ifelses ={}
 
@@ -273,10 +274,10 @@ class IntermediateCodeGenerator:
                         else:
                             return var
                     else:
-                        if type(self.symbols.get_variable(var)) != Variable:
+                        if type(self.symbols.get_variable(var)) == Array:
                             raise Exception(f"Incorrect usage of array {var} with no index provided")
-                        elif update:
-                            return var
+                        # elif update:
+                        #     return var
                         else:
                             raise Exception(f"Use of undeclared variable {var}")
                 elif value[1][0] == "array":
@@ -327,7 +328,7 @@ class IntermediateCodeGenerator:
         for i, b in enumerate(self.blocks):
             last = b.commands[-1]
             if 'j' in last[0]:
-                if last[-1] < i:
+                if last[-1] <= i:
                     self.loops[i] = last[-1]
 
     def detect_ifelse(self):
@@ -352,6 +353,8 @@ class IntermediateCodeGenerator:
                 self.ifelses.pop(i)
 
     def gen_live(self):
+        self.live_variables = set()
+        self.last_use = {}
         b_id = len(self.blocks) - 1
         ifend = None
         condend = None
@@ -359,7 +362,7 @@ class IntermediateCodeGenerator:
         for b in reversed(self.blocks):
             if b_id in [ifend, condend]:
                 for v in varcopy_ifelse:
-                    self.live_variables.add(v)
+                    self.set_live(v, b_id)
             elif b_id in self.ifelses:
                 ifend, condend = self.ifelses[b_id]
                 varcopy_ifelse = self.live_variables.copy()
@@ -367,53 +370,51 @@ class IntermediateCodeGenerator:
                 varcopy_loop = self.live_variables.copy()
                 self.gen_live_loop(b_id)
                 for v in varcopy_loop:
-                    self.live_variables.add(v)
-            b_id -= 1
+                    self.set_live(v, b_id)
+
             rewritten = []
             for c in reversed(b.commands):
                 if c[0] == 'assign':
                     if isinstance(c[1], tuple) and c[1][0] in self.live_variables:
                         if isinstance(c[1][1], str):
-                            self.live_variables.add(c[1][1])
+                            self.set_live(c[1][1], b_id)
                     elif c[1] in self.live_variables:
                         self.live_variables.remove(c[1])
                     else:
                         continue
                     for e in c[3:]:
                         if isinstance(e, tuple):
-                            self.live_variables.add(e[0])
+                            self.set_live(e[0], b_id)
                             if isinstance(e[1], str):
-                                self.live_variables.add(e[1])
+                                self.set_live(e[1], b_id)
                         elif isinstance(e, str):
-                            self.live_variables.add(e)
+                            self.set_live(e, b_id)
                     rewritten.append(c)
                 elif c[0] == 'copy':
-                    if c[1] in self.symbols.iterators:
-                        pass
-                    elif isinstance(c[1], tuple) and c[1][0] in self.live_variables:
+                    if isinstance(c[1], tuple) and c[1][0] in self.live_variables:
                         if isinstance(c[1][1], str):
-                            self.live_variables.add(c[1][1])
+                            self.set_live(c[1][1], b_id)
                     elif c[1] in self.live_variables:
                         self.live_variables.remove(c[1])
                     else:
                         continue
 
                     if isinstance(c[2], tuple):
-                        self.live_variables.add(c[2][0])
+                        self.set_live(c[2][0], b_id)
                         if isinstance(c[2][1], str):
-                            self.live_variables.add(c[2][1])
+                            self.set_live(c[2][1], b_id)
                     elif isinstance(c[2], str):
-                        self.live_variables.add(c[2])
+                        self.set_live(c[2], b_id)
                     rewritten.append(c)
 
                 elif 'j_' in c[0]:
                     for e in c[1:]:
                         if isinstance(e, tuple):
-                            self.live_variables.add(e[0])
+                            self.set_live(e[0], b_id)
                             if isinstance(e[1], str):
-                                self.live_variables.add(e[1])
+                                self.set_live(e[1], b_id)
                         elif isinstance(e, str):
-                            self.live_variables.add(e)
+                            self.set_live(e, b_id)
                     rewritten.append(c)
 
                 elif c[0] == 'read':
@@ -423,11 +424,11 @@ class IntermediateCodeGenerator:
 
                 elif c[0] == 'write':
                     if isinstance(c[1], tuple):
-                        self.live_variables.add(c[1][0])
+                        self.set_live(c[1][0], b_id)
                         if isinstance(c[1][1], str):
-                            self.live_variables.add(c[1][1])
+                            self.set_live(c[1][1], b_id)
                     else:
-                        self.live_variables.add(c[1])
+                        self.set_live(c[1], b_id)
                     rewritten.append(c)
 
                 elif c[0] == 'store':
@@ -436,7 +437,7 @@ class IntermediateCodeGenerator:
                         rewritten.append(c)
                 else:
                     rewritten.append(c)
-
+            b_id -= 1
             b.commands = list(reversed(rewritten))
 
         stored = set()
@@ -463,45 +464,45 @@ class IntermediateCodeGenerator:
                 if c[0] == 'assign':
                     if isinstance(c[1], tuple) and c[1][0] in self.live_variables:
                         if isinstance(c[1][1], str):
-                            self.live_variables.add(c[1][1])
+                            self.set_live(c[1][1], i)
                     elif c[1] in self.live_variables:
                         self.live_variables.remove(c[1])
                     else:
                         continue
                     for e in c[3:]:
                         if isinstance(e, tuple):
-                            self.live_variables.add(e[0])
-                            if isinstance(c[1][1], str):
-                                self.live_variables.add(e[1])
+                            self.set_live(e[0], i)
+                            if isinstance(e[1], str):
+                                self.set_live(e[1], i)
                         elif isinstance(e, str):
-                            self.live_variables.add(e)
+                            self.set_live(e, i)
 
                 elif c[0] == 'copy':
                     if c[1] in self.symbols.iterators:
                         pass
                     elif isinstance(c[1], tuple) and c[1][0] in self.live_variables:
                         if isinstance(c[1][1], str):
-                            self.live_variables.add(c[1][1])
+                            self.set_live(c[1][1], i)
                     elif c[1] in self.live_variables:
                         self.live_variables.remove(c[1])
                     else:
                         continue
 
                     if isinstance(c[2], tuple):
-                        self.live_variables.add(c[2][0])
+                        self.set_live(c[2][0], i)
                         if isinstance(c[2][1], str):
-                            self.live_variables.add(c[2][1])
+                            self.set_live(c[2][1], i)
                     elif isinstance(c[2], str):
-                        self.live_variables.add(c[2])
+                        self.set_live(c[2], i)
 
                 elif 'j_' in c[0]:
                     for e in c[1:]:
                         if isinstance(e, tuple):
-                            self.live_variables.add(e[0])
+                            self.set_live(e[0], i)
                             if isinstance(e[1], str):
-                                self.live_variables.add(e[1])
+                                self.set_live(e[1], i)
                         elif isinstance(e, str):
-                            self.live_variables.add(e)
+                            self.set_live(e, i)
 
                 elif c[0] == 'read':
                     if isinstance(c[1], str) and c[1] in self.live_variables:
@@ -509,11 +510,11 @@ class IntermediateCodeGenerator:
 
                 elif c[0] == 'write':
                     if isinstance(c[1], tuple):
-                        self.live_variables.add(c[1][0])
+                        self.set_live(c[1][0], i)
                         if isinstance(c[1][1], str):
-                            self.live_variables.add(c[1][1])
+                            self.set_live(c[1][1], i)
                     elif isinstance(c[1], str):
-                        self.live_variables.add(c[1])
+                        self.set_live(c[1], i)
 
     def remove_empty_loops(self):
         checks = sorted([(start, fin) for fin, start in self.loops.items()], key=lambda x: x[1]-x[0])
@@ -521,22 +522,36 @@ class IntermediateCodeGenerator:
         j = 0
         while j < len(checks):
             start, fin = checks[j]
+            cond_participants = set(self.blocks[start].commands[-1][1:3]).union(set(self.blocks[fin].commands[-1][1:3]))
+            for c in list(cond_participants):
+                if isinstance(c, tuple):
+                    for ci in c:
+                        cond_participants.add(ci)
+            cond_participants = [
+                c for c in cond_participants
+                if c in self.symbols.iterators
+                or (c in self.last_use and self.last_use[c] <= fin)
+                ]
             empty = True
-            for i in range(start, fin+1):
+
+            for i in range(fin, start-1, -1):
                 for c in self.blocks[i].commands:
-                    if c[0] == "j":
+                    if "j" in c[0]:
                         pass
-                    elif c[0] in ["inc", "dec"]:
-                        current_iterator = c[1]
-                    elif not c[1] in self.symbols.iterators:
+                    elif c[0] in ["write", "read"]:
+                        empty = False
+                        break
+                    elif isinstance(c[1], tuple):
+                        if c[1][0] not in cond_participants:
+                            empty = False
+                            break
+                    elif c[1] not in cond_participants:
                         empty = False
                         break
                 if not empty:
                     break
             if empty:
                 change = True
-                last_block = self.blocks[start-1].commands
-                self.blocks[start-1].commands = [c for c in last_block if c[1] not in f"{current_iterator}*"]
                 for i in range(start, fin + 1):
                     self.blocks[i].commands = []
             else:
@@ -552,3 +567,15 @@ class IntermediateCodeGenerator:
                 b.start_index = new_offset
                 new_offset += len(b.commands)
 
+    def remove_empty_jumps(self):
+        for i, b in enumerate(self.blocks):
+            if b.commands:
+                last_com = b.commands[-1]
+                if "j" in last_com[0]:
+                    if last_com[-1] > i+1 and not any(jb.commands for jb in self.blocks[i+1:last_com[-1]]):
+                        b.commands = b.commands[:-1]
+
+    def set_live(self, var, cur_block):
+        if var not in self.last_use or cur_block > self.last_use[var]:
+            self.last_use[var] = cur_block
+        self.live_variables.add(var)

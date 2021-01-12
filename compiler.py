@@ -123,7 +123,9 @@ class ImpParser(Parser):
 
     @_('REPEAT commands UNTIL condition ";"')
     def command(self, p):
-        return "until", p[3], p[1]
+        resp = "until", p[3], p[1], self.consts.copy()
+        self.consts.clear()
+        return resp
 
     @_('FOR PID FROM value TO value DO commands ENDFOR')
     def command(self, p):
@@ -230,7 +232,7 @@ class ImpParser(Parser):
     def error(self, token):
         raise Exception(f"Syntax error: '{token.value}' in line {token.lineno}")
 
-# sys.tracebacklimit=0
+sys.tracebacklimit=0
 lex = ImpLexer()
 pars = ImpParser()
 with open(sys.argv[1]) as in_f:
@@ -246,6 +248,7 @@ inter.detect_ifelse()
 inter.gen_live()
 inter.remove_empty_loops()
 inter.gen_live()
+inter.remove_empty_jumps()
 
 code_gen = AssemblyGenerator(inter.blocks, inter.symbols)
 code_gen.gen_code()
