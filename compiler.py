@@ -232,7 +232,7 @@ class ImpParser(Parser):
     def error(self, token):
         raise Exception(f"Syntax error: '{token.value}' in line {token.lineno}")
 
-sys.tracebacklimit=0
+# sys.tracebacklimit=0
 lex = ImpLexer()
 pars = ImpParser()
 with open(sys.argv[1]) as in_f:

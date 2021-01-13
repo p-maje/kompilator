@@ -518,6 +518,17 @@ class IntermediateCodeGenerator:
 
     def remove_empty_loops(self):
         checks = sorted([(start, fin) for fin, start in self.loops.items()], key=lambda x: x[1]-x[0])
+        sorted_checks = []
+        while checks:
+            s, f = checks[0]
+            group = [(s1, f1) for s1, f1 in checks if s1 <= s and f <= f1]
+            for el in group:
+                checks.remove(el)
+            sorted_checks.append(group)
+        sorted_checks = sorted(sorted_checks, key=lambda gr: max(e[1] for e in gr), reverse=True)
+        for g in sorted_checks:
+            checks.extend(g)
+
         change = False
         j = 0
         while j < len(checks):
@@ -530,7 +541,7 @@ class IntermediateCodeGenerator:
             cond_participants = [
                 c for c in cond_participants
                 if c in self.symbols.iterators
-                or (c in self.last_use and self.last_use[c] <= fin)
+                or (c in self.last_use and max(self.last_use[c]) <= fin)
                 ]
             empty = True
 
@@ -542,10 +553,10 @@ class IntermediateCodeGenerator:
                         empty = False
                         break
                     elif isinstance(c[1], tuple):
-                        if c[1][0] not in cond_participants:
+                        if c[1][0] not in cond_participants and max(self.last_use[c[1][0]]) > i:
                             empty = False
                             break
-                    elif c[1] not in cond_participants:
+                    elif c[1] not in cond_participants and max(self.last_use[c[1]]) > i:
                         empty = False
                         break
                 if not empty:
@@ -553,6 +564,9 @@ class IntermediateCodeGenerator:
             if empty:
                 change = True
                 for i in range(start, fin + 1):
+                    for v in self.last_use:
+                        if i in self.last_use[v]:
+                            self.last_use[v].remove(i)
                     self.blocks[i].commands = []
             else:
                 remaining = checks[j+1:]
@@ -576,6 +590,8 @@ class IntermediateCodeGenerator:
                         b.commands = b.commands[:-1]
 
     def set_live(self, var, cur_block):
-        if var not in self.last_use or cur_block > self.last_use[var]:
-            self.last_use[var] = cur_block
+        if var not in self.last_use:
+            self.last_use[var] = {cur_block}
+        else:
+            self.last_use[var].add(cur_block)
         self.live_variables.add(var)

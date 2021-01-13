@@ -411,5 +411,3 @@ class AssemblyGenerator:
     def load_variable_address(self, name, reg):
         address = self.symbols.get_address(name)
         self.gen_const(address, reg)
-            # if self.iterators and name == self.iterators[-1]:
-            #     self.code.append(f"STORE f {reg}")
