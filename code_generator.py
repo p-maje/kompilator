@@ -275,7 +275,7 @@ class CodeGenerator:
         else:
             if expression[1][0] == 'const':
                 const, var = 1, 2
-            elif expression[1][0] == 'const':
+            elif expression[2][0] == 'const':
                 const, var = 2, 1
             else:
                 const = None
@@ -342,8 +342,14 @@ class CodeGenerator:
                             val /= 2
                         return
 
-                self.calculate_expression(expression[1], second_reg, target_reg)
-                self.calculate_expression(expression[2], third_reg, target_reg)
+                if expression[1] == expression[2]:
+                    self.calculate_expression(expression[1], second_reg, target_reg)
+                    self.code.append(f"RESET {third_reg}")
+                    self.code.append(f"ADD {third_reg} {second_reg}")
+                else:
+                    self.calculate_expression(expression[1], second_reg, target_reg)
+                    self.calculate_expression(expression[2], third_reg, target_reg)
+
                 self.code.append(f"RESET {target_reg}")
                 self.code.append(f"JZERO {second_reg} 21")
                 self.code.append(f"JZERO {third_reg} 20")
@@ -380,7 +386,9 @@ class CodeGenerator:
                     return
 
                 elif expression[1] == expression[2]:
+                    self.calculate_expression(expression[1], third_reg, second_reg)
                     self.code.append(f"RESET {target_reg}")
+                    self.code.append(f"JZERO {third_reg} 2")
                     self.code.append(f"INC {target_reg}")
                     return
 

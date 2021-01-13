@@ -1,0 +1,14 @@
+[
+    const_storing.imp – zapisywanie stałych w pamięci
+    > 2137
+]
+DECLARE
+	a
+BEGIN
+	a := 1;
+	IF a > 1 THEN   [ nie wejdziemy w środek, gdzie jest pierwsze wypisanie stałej ]
+	    WRITE 2137; [ jeśli jej zapis do pamięci nastąpi tutaj, write za ifem wydrukuje coś nieokreślonego ]
+	ENDIF
+	WRITE 2137;
+END
+

@@ -1,0 +1,33 @@
+[
+    test_aritmopt4.imp – działania z jedną zmienną
+    > (kolejno od 1 do 5)
+]
+DECLARE
+    k, b
+BEGIN
+    b := 2;
+    k := b + b;
+    IF k = 4 THEN
+    WRITE 1;
+    ENDIF
+
+    k := b - b;
+    IF k = 0 THEN
+    WRITE 2;
+    ENDIF
+
+    k := b * b;
+    IF k = 4 THEN
+    WRITE 3;
+    ENDIF
+
+    k := b / b;
+    IF k = 1 THEN
+    WRITE 4;
+    ENDIF
+
+    k := b % b;
+    IF k = 0 THEN
+    WRITE 5;
+    ENDIF
+END
