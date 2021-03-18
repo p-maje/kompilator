@@ -1,43 +1,34 @@
-# Projekt kompilatora
-Kompilator prostego języka imperatywnego stworzony podczas kursu Języki formalne i teoria translacji na WPPT, PWr (semestr
-zimowy 20/21).
+EN | <a href="README.pl.md">PL</a>
 
-### Wymagania:
-**Python 3.8.5**  
-**SLY 0.4** – `pip3 install sly`
+# Compiler of a Simple Imperative Language
+Developed as part of a Formal Languages and Translation Techniques course at Wrocław University of Science and Technology (winter 2020/2021).
 
-### Użycie:
+## Technologies
+Created using:
+- **Python 3.8.5**  
+- **<a href=https://pypi.org/project/sly/>SLY 0.4</a>**
+
+## How to use
+In the main directory run
 ```bash
-python3 compiler.py <nazwa pliku wejściowego> <nazwa pliku wyjściowego>
+python3 compiler.py <input file> <output file>
 ```
 
-### Pliki:
-- `specyfikacja.pdf` – zawiera wymagania dotyczące projektu, gramatykę kompilowanego języka i obsługiwane komendy języka wyjściowego,
-- `compiler.py` – zawiera lekser i parser oraz skrypt czytający plik wejściowy i wypisujący kod do pliku wyjściowego,  
-- `symbol_table.py` – zawiera klasy odpowiedzialne za zarządzanie zmiennymi i pamięcią,  
-- `code_generator.py` – zawiera klasę generującą kod assemblera na podstawie drzewa skonstruowanego przez parser.
-#### Dodatkowo:
-- W katalogach z testami umieszczone są przykładowe programy pozwalające na sprawdzenie poprawności generowanego kodu. Autorami większości z nich są mgr inż. Karol Gotfryd i dr Maciej Gębala. Można je uruchomić z użyciem skryptu `test.sh`, jako argument wywołania podając wybrany katalog. Testy sprawdzające obsługę błędów można uruchomić z użyciem skryptu `test_errors.sh` bez argumentów wywołania. Skrypty należy wykonywać z katalogu, w którym znajdują się pliki projektu; wymagają też skompilowanej maszyny wirtualnej w tym samym katalogu.
-- W katalogu `maszyna_wirtualna` znajduje się kod maszyny wirtualnej autorstwa dra Macieja Gębali. Sporo testów wymaga skompilowania jej w wariancie z biblioteką `cln`.
-- W katalogu `misc` znajdują się dodatkowe pomocnicze skrypty.
+## Files
+- `specs.pdf` – project guidelines including the grammar of the compiled langugage and the assembly commands available in the virtual machine (in Polish),
+- `compiler.py` – the lexer and the parser,  
+- `symbol_table.py` – memory management and the symbol table,
+- `code_generator.py` – generation of the output assembly code from the syntax tree.
 
-### Uwagi i rady po projekcie:
-Kompilator przeszedł wszystkie testy rankingowe i zajął ostatecznie 13 miejsce. Zastosowane w nim optymalizacje są dosyć
-proste i lokalne, ale jak widać całkiem skuteczne (szczególnie duże znaczenie mają pewnie uproszczenia operacji 
-arytmetycznych i całkiem okej napisane pętle). Optymalizacja rejestrów okazała się skomplikowana (głównie ze względu na 
-sposób odczytu i zapisu pamięci w zadanym assemblerze), dlatego w końcu z niej zrezygnowałem, więc generowany kod zawiera 
-bardzo dużo niepotrzebnych loadów i store'ów. Nie udało mi się też doprowadzić do końca optymalizacji związanych z 
-usuwaniem martwego kodu.  
-  
-Próby implementowania tych potężniejszych optymalizacji znajdują się na branchach i bazują na książce *Kompilatory: 
-reguły, metody i narzędzia* – Aho, Lam, Sethi, Ullman. W przypadku decydowania się na takie radykalne metody warto 
-napisać kompilator tak, żeby zawierał etap generowania kodu pośredniego, na którym łatwiej jest przeprowadzać tego 
-typu optymalizacje. Wersja ostateczna projektu nie ma w sobie tego etapu, występuje on natomiast na branchu `deadcode`.  
-  
-Jeśli chodzi o kolejność prac, warto zacząć od leksera i parsera, potem podstawowej wersji tablicy symboli. Trzeba 
-zdecydować o strukturze danych, z których generowany będzie kod assemblera. Ja wybrałem proste syntax tree 
-reprezentowane przez zagnieżdżone krotki, inną opcją jest wspomniany wcześniej kod pośredni (przykłady w rozdziale 6 
-*Kompilatorów*). W generowaniu kodu assemblera dobrze będzie wziąć się najpierw za prostsze sprawy – generowanie stałych
-i instrukcje wejścia/wyjścia. Potem operacje arytmetyczne, instrukcje warunkowe, na koniec pętle, które z nich korzystają. 
-Obsługę większości błędów (tych niewykrywalnych w fazie parsowania) można raczej zostawić sobie na koniec. 
-Będzie okej, trzymam kciuki.
+The `tests_*` directories contain some examples that allow to test the output code. Most of them were written by <a href="cs.pwr.edu.pl/gebala">Maciej Gębala</a> and <a href="cs.pwr.edu.pl/gotfryd">Karol Gotfryd</a>. They can be conveniently run with
+```bash
+./test.sh <directory name>
+```
+
+Error handling tests can be run using
+```bash
+./test_errors.sh
+```
+Both scripts require a pre-compiled virtual machine executable in the main project directory. The machine was developed by the lecturer, Maciej Gębala. Its sources can be found inside the `virtual_machine` directory. In order for all tests to run correctly, build it with the <a href="https://www.ginac.de/CLN/">CLN library</a> installed.
+
+The `misc` directory contains some simple scripts that helped me during the development process.

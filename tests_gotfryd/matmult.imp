@@ -1,0 +1,95 @@
+[ matmult.imp - mnożenie macierzy kwadratowych n x n, n <= 10
+
+    ./kompilator matmult.imp matmult.mr
+    
+    INPUT (wywołanie skompilowanego programu matmult.mr):
+        1. echo "3 111 900 222 800 333 700 444 600 555 500 666 400 777 300 888 200 999 100" | ./maszyna-wirtualna matmult.mr
+        2. echo "5 10 20 20 40 30 60 40 80 50 100 20 40 30 60 40 80 50 100 60 120 30 60 40 80 50 100 60 120 70 140 40 80 50 100 60 120 70 140 80 160 50 100 60 120 70 140 80 160 90 180" | ./maszyna-wirtualna matmult.mr
+        
+    OUTPUT:
+        1. > 111111111 | 2. > 111111111
+           > 333000    |    > 11000
+           > 266400    |    > 14000
+           > 199800    |    > 17000
+           > 111111111 |    > 20000
+           > 932400    |    > 23000
+           > 765900    |    > 111111111
+           > 599400    |    > 14000
+           > 111111111 |    > 18000
+           > 1531800   |    > 22000
+           > 1265400   |    > 26000
+           > 999000    |    > 30000
+                       |    > 111111111
+                       |    > 17000
+                       |    > 22000
+                       |    > 27000
+                       |    > 32000
+                       |    > 37000
+                       |    > 111111111
+                       |    > 20000
+                       |    > 26000
+                       |    > 32000
+                       |    > 38000
+                       |    > 44000
+                       |    > 111111111
+                       |    > 23000
+                       |    > 30000
+                       |    > 37000
+                       |    > 44000
+                       |    > 51000
+
+] 
+DECLARE
+	ma(1:100), mb(1:100), mc(1:100), n, s, idx, idx_a, idx_b
+BEGIN
+	READ n; [ ### wczyatywanie rozmiaru macierzy]
+	IF n > 10 THEN [ ### czy nie wykraczamy poza zakres - max. macierz 10x10 ]
+		WRITE 0;
+	ELSE
+		[ ### wczytywanie macierzy ma i mb -> jednocześnie, wierszami ]
+		FOR row FROM 1 TO n DO
+			FOR col FROM 1 TO n DO 
+				[ ### idx = (row-1)*n + col]
+				idx := row - 1;
+				idx := idx * n;
+				idx := idx + col; 
+				READ ma(idx);
+				READ mb(idx);
+			ENDFOR
+		ENDFOR
+		[ ### mc = ma*mb - mnożenie macierzy ]
+		FOR i FROM 1 TO n DO
+			FOR j FROM 1 TO n DO
+				[ ### idx = (i-1)*n + j]
+				idx := i - 1;
+				idx := idx * n; 
+				idx := idx + j;
+				mc(idx) := 0; 
+				FOR k FROM 1 TO n DO [ ### mc(i,j) = \sum_{k=1}^{n} ma(i,k)*mb(k,j) ]
+					[ ### idx_a := (i-1)*n + k]
+					idx_a := i - 1;
+					idx_a := idx_a * n;
+					idx_a := idx_a + k;			
+					[ ### idx_b := (k-1)*n + j]
+					idx_b := k - 1;
+					idx_b := idx_b * n;
+					idx_b := idx_b + j;
+					s := ma(idx_a) * mb(idx_b);
+					mc(idx) := mc(idx) + s;
+				ENDFOR
+			ENDFOR
+		ENDFOR
+		[ ### wypisywanie macierzy mc (wierszami, wiersze oddzielone 111111111) ]
+		FOR row FROM 1 TO n DO
+			WRITE 111111111;
+			FOR col FROM 1 TO n DO 
+				[ ### idx = (row-1)*n + col]
+				idx := row - 1;
+				idx := idx * n;
+				idx := idx + col; 
+				WRITE mc(idx);
+			ENDFOR
+		ENDFOR
+	ENDIF
+END
+
