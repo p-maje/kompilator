@@ -20,7 +20,7 @@ python3 compiler.py <input file> <output file>
 - `symbol_table.py` – memory management and the symbol table,
 - `code_generator.py` – generation of the output assembly code from the syntax tree.
 
-The `tests_*` directories contain some examples that allow to test the output code. Most of them were written by <a href="cs.pwr.edu.pl/gebala">Maciej Gębala</a> and <a href="cs.pwr.edu.pl/gotfryd">Karol Gotfryd</a>. They can be conveniently run with
+The `tests_*` directories contain some examples that allow to test the output code. Most of them were written by <a href="https://www.cs.pwr.edu.pl/gebala">Maciej Gębala</a> and <a href="https://www.cs.pwr.edu.pl/gotfryd">Karol Gotfryd</a>. They can be conveniently run with
 ```bash
 ./test.sh <directory name>
 ```
